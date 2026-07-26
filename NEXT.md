@@ -38,3 +38,20 @@ reaches him as "Text-in caller".
 - **Merge case:** if that number later signs up in the app, attach the auth user to the existing
   contact rather than creating a second record. Get this right — one person as two records is
   worse than no contact list at all.
+
+## 4. The Rov's console on a phone should be a phone app
+
+Below `md` the console currently reflows the desktop rather than becoming something built for a
+phone. He will use it standing in shul, one-handed, so this matters more than it sounds.
+
+- **Diary.** A six-column week grid does not work at 390px. It should become one day at a time,
+  swipeable, with the date strip along the top — the week view stays for tablet and desktop.
+- **Opening times.** The 620px drawer becomes a bottom sheet that comes up from the bottom, with
+  the chips at proper thumb size and the day headings sticky as he scrolls. This is the screen he
+  is most likely to use on a phone and the least suited to it today.
+- **Answer drawer.** Full-screen on a phone, not a side panel — with the question, the answer box
+  and dictation stacked, and "Send the answer" pinned above the keyboard.
+- Tap targets to 44px throughout, and the bottom bar respecting the home indicator (it already
+  uses `env(safe-area-inset-bottom)`, but the sheets do not).
+- Test at 390×844 with the on-screen keyboard up: several of these screens have a fixed footer
+  that the keyboard will cover.
