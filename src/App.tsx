@@ -17,6 +17,7 @@ import { TodayPage } from './components/rabbi/TodayPage';
 import { QueuePage } from './components/rabbi/QueuePage';
 import { DiaryPage } from './components/rabbi/DiaryPage';
 import { RequestsPage } from './components/rabbi/RequestsPage';
+import { TextsPage } from './components/rabbi/TextsPage';
 import { SettingsPage } from './components/rabbi/SettingsPage';
 
 // Route gate: no session → login; session without a profile → finish signup; admins land on
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="questions" element={<QueuePage />} />
             <Route path="diary" element={<DiaryPage />} />
             <Route path="requests" element={<RequestsPage />} />
+            <Route path="texts" element={<TextsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

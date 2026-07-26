@@ -145,8 +145,9 @@ export async function fetchLatestBriefing(): Promise<string | null> {
 
 export async function fetchHandedOffConversations(): Promise<{ id: string; phone: string; updated_at: string }[]> {
   if (isDemo()) return demoHandedOff;
-  const { data } = await supabase.from('rabbi_conversations')
-    .select('id, phone, updated_at').eq('state', 'handed_off').order('updated_at', { ascending: false });
+  // Through a function, not the table: a helper needs to know somebody wants ringing back, and
+  // must not be handed the words they texted to get there.
+  const { data } = await supabase.rpc('rabbi_handed_off_lines');
   return (data as { id: string; phone: string; updated_at: string }[]) ?? [];
 }
 
@@ -184,4 +185,68 @@ export function findClash(
     const [eh, em] = b.end_time.split(':').map(Number);
     return startMin < eh * 60 + em && endMin > bh * 60 + bm;
   }) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// The text-in line, in full.
+//
+// A shailah only exists once somebody replies YES, and a booking only once they pick a time — so
+// every conversation that stopped short of that used to leave no trace the Rov could see. These
+// two reads are the trace: every text in and out, whether or not it ever became anything.
+
+export interface ConversationRow {
+  id: string;
+  phone: string;
+  state: string;
+  intent: string | null;
+  draft: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  profile_id: string | null;
+}
+
+export interface ConversationMessage {
+  id: string;
+  direction: 'in' | 'out';
+  body: string;
+  created_at: string;
+  status: string | null;
+  error: string | null;
+}
+
+export async function fetchConversations(limit = 60): Promise<ConversationRow[]> {
+  if (isDemo()) return [];
+  const { data } = await supabase.from('rabbi_conversations')
+    .select('id, phone, state, intent, draft, created_at, updated_at, profile_id')
+    .order('updated_at', { ascending: false }).limit(limit);
+  return (data as ConversationRow[]) ?? [];
+}
+
+export async function fetchConversationMessages(conversationId: string): Promise<ConversationMessage[]> {
+  if (isDemo()) return [];
+  const { data } = await supabase.from('rabbi_messages')
+    .select('id, direction, body, created_at, status, error')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+  return (data as ConversationMessage[]) ?? [];
+}
+
+/** Whatever a conversation actually produced, so "nothing came of this" is a fact and not a guess. */
+export async function fetchConversationOutcomes(
+  conversationIds: string[],
+): Promise<Map<string, { shailos: string[]; bookings: string[] }>> {
+  const out = new Map<string, { shailos: string[]; bookings: string[] }>();
+  if (isDemo() || !conversationIds.length) return out;
+  const { data } = await supabase.from('rabbi_messages')
+    .select('conversation_id, related_type, related_id')
+    .in('conversation_id', conversationIds)
+    .in('related_type', ['shailah', 'booking']);
+  for (const m of (data ?? []) as { conversation_id: string; related_type: string; related_id: string }[]) {
+    if (!m.related_id) continue;
+    const e = out.get(m.conversation_id) ?? { shailos: [], bookings: [] };
+    const list = m.related_type === 'shailah' ? e.shailos : e.bookings;
+    if (!list.includes(m.related_id)) list.push(m.related_id);
+    out.set(m.conversation_id, e);
+  }
+  return out;
 }

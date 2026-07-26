@@ -359,6 +359,8 @@ export interface CreateBookingInput {
   channel: "app" | "sms" | "whatsapp" | "staff";
   slot: SlotOut;
   purpose?: string | null;
+  /** How soon they need him. He decides what to ring first from this and the purpose. */
+  urgencyTierId?: string | null;
 }
 
 export async function createBooking(
@@ -385,6 +387,7 @@ export async function createBooking(
     starts_at: input.slot.startsAt,
     ends_at: input.slot.endsAt,
     purpose: input.purpose ? input.purpose.slice(0, 500) : null,
+    urgency_tier_id: input.urgencyTierId ?? null,
     status: autoConfirm ? "confirmed" : "requested",
     channel: input.channel,
   }).select().single();

@@ -14,6 +14,7 @@ const NAV = [
   { to: '/rabbi/questions', label: 'Questions', icon: '✦', count: 'questions' as const },
   { to: '/rabbi/diary', label: 'Diary', icon: '▤', count: null },
   { to: '/rabbi/requests', label: 'Requests', icon: '✧', count: 'requests' as const },
+  { to: '/rabbi/texts', label: 'Texts', icon: '✉', count: null, rovOnly: true },
   { to: '/rabbi/settings', label: 'Settings', icon: '⚙', count: null },
 ];
 
@@ -22,6 +23,7 @@ const TITLES: Record<string, [string, string]> = {
   '/rabbi/questions': ['Questions', 'Every shailah, open and answered.'],
   '/rabbi/diary': ['Diary', 'Your week, and the times people can book.'],
   '/rabbi/requests': ['Requests', 'Calls, meetings and invitations to speak.'],
+  '/rabbi/texts': ['Texts', 'Every conversation on the text-in line, in full.'],
   '/rabbi/settings': ['Settings', 'Plain switches. Everything saves itself.'],
 };
 
@@ -55,7 +57,7 @@ export function RabbiShell() {
         </div>
 
         <div className="flex flex-col gap-[3px]">
-          {NAV.map((n) => {
+          {NAV.filter((n) => !n.rovOnly || profile?.role === 'rabbi').map((n) => {
             const badge = n.count ? counts[n.count] : 0;
             return (
               <NavLink key={n.to} to={n.to} end={n.end}
@@ -120,7 +122,7 @@ export function RabbiShell() {
 
       {/* Phone: the rail becomes a bottom bar. */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-graphite flex px-1 pt-1 pb-[max(6px,env(safe-area-inset-bottom))]">
-        {NAV.map((n) => {
+        {NAV.filter((n) => !n.rovOnly || profile?.role === 'rabbi').map((n) => {
           const badge = n.count ? counts[n.count] : 0;
           return (
             <NavLink key={n.to} to={n.to} end={n.end}

@@ -433,8 +433,13 @@ Deno.serve(async (req: Request) => {
               ? admin.from("rabbi_urgency_tiers").select("id").eq("slug", draft.urgency_slug).maybeSingle()
               : Promise.resolve({ data: null }),
           ]);
+          // profileId, not profile.id: somebody who gave their name earlier in THIS conversation
+          // became a contact a few turns ago, and the row loaded at the top of the request
+          // predates them. Using the stale one left the shailah attached to nobody, which is
+          // how S-0001 reached the Rov as a phone number rather than as Anthony Geller.
+          if (!profileId && (draft.name ?? null)) profileId = await rememberContact(from, draft.name!);
           const result = await createShailah(admin, settings, {
-            profileId: profile?.id ?? null,
+            profileId,
             contactName: profile?.full_name ?? draft.name ?? null,
             contactPhone: from,
             channel: "sms",
@@ -453,13 +458,18 @@ Deno.serve(async (req: Request) => {
         }
         if ((conv.intent === "call" || conv.intent === "meeting") && draft.slot_index && draft.offered_slots) {
           const slot = draft.offered_slots[draft.slot_index - 1];
+          if (!profileId && (draft.name ?? null)) profileId = await rememberContact(from, draft.name!);
+          const { data: bTier } = draft.urgency_slug
+            ? await admin.from("rabbi_urgency_tiers").select("id").eq("slug", draft.urgency_slug).maybeSingle()
+            : { data: null };
           const result = await createBooking(admin, settings, {
-            profileId: profile?.id ?? null,
+            profileId,
             contactName: profile?.full_name ?? draft.name ?? null,
             contactPhone: from,
             channel: "sms",
             slot,
             purpose: draft.purpose ?? null,
+            urgencyTierId: bTier?.id ?? null,
           });
           if (result.error === "slot_taken") {
             const slots = (await expandSlots(admin, slot.slotType, tz, 60, settings.erev_cutoff_minutes ?? 90)).slice(0, MAX_SLOTS_OFFERED);
@@ -512,6 +522,15 @@ WHAT THEY WANT (decide this first, every turn):
 FOR A CALL OR A MEETING:
 Ask what it is concerning ONCE, in one line \u2014 the Rov wants to know what the call is about before he rings, and a one-line answer is enough ("my son\u2019s school", "a business matter"). Put it in "purpose".
 "It's private", "personal", "I'd rather not say", "I'll tell him myself" IS THE ANSWER. Accept it warmly \u2014 "of course, that's between you and the Rov" \u2014 put "private" in "purpose" and move straight on to the times. Asking a second time after somebody has said it is private is the worst thing this service can do. You get one ask, and only if they said nothing about it at all.
+
+HOW SOON THEY NEED IT \u2014 for a call or a meeting just as much as for a question:
+Somebody asking to speak to the Rov about a levaya tomorrow and somebody asking about a business
+matter are not the same request, and he needs to know which is which before he decides what to
+ring first. So work out urgency_slug for bookings too, from what they say and from the purpose
+they gave \u2014 "before Shabbos", "my father is very unwell", "when he has a minute", "no rush".
+If the purpose makes it obvious, do not ask at all. If it genuinely is not clear and they have
+already chosen a time, ask once, plainly: "Does this need him before then, or is that time fine?"
+Never delay offering times in order to ask it.
 
 HOW URGENT \u2014 never ask them to pick a word:
 Do NOT write "urgent, soon or standard", or offer the tier names in any form. They are labels for
