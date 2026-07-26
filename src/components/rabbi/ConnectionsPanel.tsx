@@ -11,7 +11,7 @@ import { Btn, Panel, inputCls } from '../shared/ui';
  * and its last four characters, so he can tell one from another. Only the Rov sees this panel;
  * a helper can run the whole app without holding the keys to the account.
  */
-type Status = Record<string, { set: boolean; hint: string | null }>;
+type Status = Record<string, { set: boolean; hint: string | null; value?: string }>;
 
 const KEYS: { name: string; label: string; hint: string; placeholder: string }[] = [
   { name: 'TEXTMAGIC_USERNAME', label: 'TextMagic username', placeholder: 'your TextMagic login',
@@ -22,13 +22,36 @@ const KEYS: { name: string; label: string; hint: string; placeholder: string }[]
     hint: 'Your dedicated TextMagic number. Leave blank to use the account default.' },
   { name: 'OPENAI_API_KEY', label: 'OpenAI key', placeholder: 'sk-…',
     hint: 'Sorting questions, the text-in assistant, the morning briefing, voice notes.' },
-  { name: 'OPENAI_SMS_MODEL', label: 'Model behind the text-in assistant', placeholder: 'gpt-5.4-mini',
-    hint: 'Leave blank for the one it ships with. A stronger model reads people better and costs '
-      + 'more per text. Changed here, the very next text uses it — no rebuild.' },
 ];
 
-/** The model name is not a credential, so it is shown back in full rather than as four characters. */
-const PLAIN = new Set(['TEXTMAGIC_SENDER', 'OPENAI_SMS_MODEL']);
+/** The number texts come from is not a credential, so it is shown back rather than dotted out. */
+const PLAIN = new Set(['TEXTMAGIC_SENDER']);
+
+/**
+ * The model behind the text-in assistant, offered as a list rather than a box to type a name
+ * into — a typo here is not a validation error, it is the assistant falling over on somebody's
+ * shailah at eleven at night.
+ *
+ * Prices are per million tokens as of July 2026; a text-in turn is roughly two thousand in and a
+ * couple of hundred out, so even the dearest is a fraction of a penny a message — far less than
+ * the text itself costs to send. Check openai.com/api/pricing before trusting these numbers, and
+ * use "Check the AI" after changing it: that sends one real request to whatever is selected, so
+ * a name OpenAI does not recognise shows up here and now rather than on a live conversation.
+ */
+const SMS_MODELS: { value: string; label: string; note: string }[] = [
+  { value: '', label: 'The one it ships with (gpt-5.4-mini)',
+    note: 'What every text has used so far.' },
+  { value: 'gpt-5.4', label: 'gpt-5.4 — the full model',
+    note: 'Best at following the rules it is given, which is where the assistant has been going '
+      + 'wrong. Dearest of the three, and still a fraction of a penny a text.' },
+  { value: 'gpt-5.4-mini', label: 'gpt-5.4-mini — the middle one',
+    note: 'The same as the default, named outright.' },
+  { value: 'gpt-5.4-nano', label: 'gpt-5.4-nano — the cheapest',
+    note: 'Built for sorting and extracting, not for holding a conversation. Expect it to read '
+      + 'people poorly.' },
+  { value: '__custom__', label: 'Something else…',
+    note: 'Type any model name your OpenAI account can reach.' },
+];
 
 export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | null; say: (m: string) => void }) {
   const [status, setStatus] = useState<Status | null>(null);
@@ -38,6 +61,8 @@ export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | nul
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [hook, setHook] = useState<{ url: string; everReceived: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [modelPick, setModelPick] = useState<string | null>(null);
+  const [modelCustom, setModelCustom] = useState('');
 
   const call = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke('rabbi-secrets', { body });
@@ -90,13 +115,35 @@ export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | nul
     } finally { setBusy(null); }
   };
 
+  // What is running now, and what the dropdown should be showing before he touches it.
+  const savedModel = status?.OPENAI_SMS_MODEL?.value ?? '';
+  const known = SMS_MODELS.some((m) => m.value === savedModel && m.value !== '__custom__');
+  const selected = modelPick ?? (savedModel ? (known ? savedModel : '__custom__') : '');
+  const chosenModel = selected === '__custom__' ? modelCustom.trim() : selected;
+  const modelNote = SMS_MODELS.find((m) => m.value === selected)?.note ?? '';
+  const modelDirty = chosenModel !== savedModel;
+
+  const saveModel = async () => {
+    setBusy('model'); setResult(null);
+    try {
+      // Blank means "whatever the app ships with", which is an empty vault entry rather than a
+      // model called "". set_secret rejects empty, so clearing writes the shipped name outright.
+      if (!isDemo()) await call({ action: 'save', name: 'OPENAI_SMS_MODEL', value: chosenModel || 'gpt-5.4-mini' });
+      await load();
+      setModelPick(null);
+      say(chosenModel ? `The assistant will use ${chosenModel} from the next text.` : 'Back to the model it ships with.');
+    } catch (e) {
+      say(e instanceof Error ? e.message : 'Could not save that.');
+    } finally { setBusy(null); }
+  };
+
   const testAi = async () => {
     setBusy('ai'); setResult(null);
     try {
-      const r = isDemo() ? { ok: true, model: 'gpt-5.4-nano' } : await call({ action: 'test_openai' });
+      const r = isDemo() ? { ok: true, model: savedModel || 'gpt-5.4-mini' } : await call({ action: 'test_openai' });
       setResult(r.ok
         ? { ok: true, text: `Working — ${r.model} answered.` }
-        : { ok: false, text: String(r.reason ?? 'OpenAI would not answer.') });
+        : { ok: false, text: `${r.model ? `${r.model}: ` : ''}${String(r.reason ?? 'OpenAI would not answer.')}` });
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : 'Could not reach OpenAI.' });
     } finally { setBusy(null); }
@@ -142,6 +189,44 @@ export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | nul
             </div>
           );
         })}
+      </div>
+
+      <div className="rounded-md bg-canvas border p-4 flex flex-col gap-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[13px] font-bold">The model behind the text-in assistant</span>
+          <span className="rounded-chip px-2 py-[2px] text-[10.5px] font-bold bg-chip text-ink-muted font-mono">
+            now: {savedModel || 'gpt-5.4-mini'}
+          </span>
+        </div>
+        <span className="text-[12.5px] leading-relaxed text-ink-soft">
+          This decides how well the assistant reads people — whether it takes “it’s private” for an
+          answer, and whether it can tell a new question from the next line of the old one.
+        </span>
+        <div className="flex gap-2 flex-wrap">
+          <select
+            className={inputCls + ' flex-1 min-w-[220px] !text-[13.5px]'}
+            value={selected}
+            onChange={(e) => { setModelPick(e.target.value); setResult(null); }}
+          >
+            {SMS_MODELS.map((m) => <option key={m.value || 'default'} value={m.value}>{m.label}</option>)}
+          </select>
+          <Btn tone="dark" busy={busy === 'model'}
+            disabled={!modelDirty || (selected === '__custom__' && !modelCustom.trim())}
+            onClick={saveModel}>Use this one</Btn>
+        </div>
+        {selected === '__custom__' && (
+          <input
+            className={inputCls + ' font-mono !text-[13.5px]'}
+            autoComplete="off" spellCheck={false} placeholder="model name, exactly as OpenAI writes it"
+            value={modelCustom} onChange={(e) => setModelCustom(e.target.value)}
+          />
+        )}
+        {modelNote && <span className="text-[11.5px] leading-snug text-ink-muted">{modelNote}</span>}
+        <span className="text-[11.5px] leading-snug text-ink-muted">
+          Press <b>Check the AI</b> below after changing it — that sends one real request to
+          whichever model is selected, so a name OpenAI doesn’t recognise shows up here rather
+          than on somebody’s shailah.
+        </span>
       </div>
 
       {hook && (

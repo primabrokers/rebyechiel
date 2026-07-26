@@ -51,10 +51,15 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       // Which keys are set — never the values themselves.
       case "status": {
-        const out: Record<string, { set: boolean; hint: string | null }> = {};
+        const out: Record<string, { set: boolean; hint: string | null; value?: string }> = {};
         for (const name of ALLOWED) {
           const { data } = await admin.rpc("secret_hint", { secret_name: name });
           out[name] = (data as { set: boolean; hint: string | null }) ?? { set: false, hint: null };
+          // The chosen model is not a credential, and a screen that cannot tell you which model
+          // is running is no use for choosing one. Never do this for anything that IS a secret.
+          if (name === "OPENAI_SMS_MODEL" && out[name].set) {
+            out[name].value = (await getSecret(name)) ?? undefined;
+          }
         }
         return json({ secrets: out });
       }
@@ -83,19 +88,26 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true, sentTo: to });
       }
 
-      // A one-token completion: the cheapest possible proof that the key is live.
+      /**
+       * A one-token completion: the cheapest possible proof that the key is live.
+       *
+       * It tests the model the text-in assistant will actually use, not a fixed one — the point
+       * of a model setting is being able to try a different model, and a name OpenAI does not
+       * recognise should fail here, in front of the Rov, rather than on somebody's shailah.
+       */
       case "test_openai": {
-        clearSecretCache("OPENAI_API_KEY");
+        clearSecretCache();
+        const model = (await getSecret("OPENAI_SMS_MODEL"))?.trim() || MODELS.nano;
         try {
           const r = await callOpenAI({
-            model: MODELS.nano, maxTokens: 16,
+            model, maxTokens: 16,
             system: 'Reply with the JSON object {"ok":true} and nothing else.',
             json: true,
             messages: [{ role: "user", content: "ping" }],
           });
-          return json({ ok: true, model: MODELS.nano, reply: r.text.slice(0, 60) });
+          return json({ ok: true, model, reply: r.text.slice(0, 60) });
         } catch (err) {
-          return json({ ok: false, reason: err instanceof Error ? err.message.slice(0, 200) : "failed" });
+          return json({ ok: false, model, reason: err instanceof Error ? err.message.slice(0, 200) : "failed" });
         }
       }
 
