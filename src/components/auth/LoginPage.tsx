@@ -10,6 +10,16 @@ import { BigButton, Field, Note, Screen, StepBar, inputCls } from '../shared/ui'
  * helpers get in, not how the kehillah does.
  */
 
+/**
+ * The Rov's own address. rabbi.rebyechiel.org is the one he is given and the one he will type,
+ * and what he needs there is his sign-in — email and password — not the kehillah's front door
+ * asking for a mobile number he does not sign in with.
+ */
+export function isAdminHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /^(rabbi|rov|admin)\./i.test(window.location.hostname);
+}
+
 /** Turns whatever they typed into E.164 — the field shows +44 already, so a leading 0 is theirs. */
 function ukNumber(typed: string): string {
   const d = typed.replace(/\D/g, '');
@@ -47,7 +57,8 @@ function CodeBoxes({ value, onChange }: { value: string; onChange: (v: string) =
 
 export function LoginPage() {
   const nav = useNavigate();
-  const [screen, setScreen] = useState<'welcome' | 'code' | 'email'>('welcome');
+  const admin = isAdminHost();
+  const [screen, setScreen] = useState<'welcome' | 'code' | 'email'>(admin ? 'email' : 'welcome');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
@@ -128,27 +139,75 @@ export function LoginPage() {
   }
 
   // --- email and password, for the Rov and his helpers ---------------------------------------
+  // On his own address this IS the sign-in, so it gets the full two-column treatment rather than
+  // looking like a page he ended up on by accident.
   if (screen === 'email') {
-    return (
-      <Screen tone="surface">
-        <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
-        <div className="px-5 md:px-7 py-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[24px] font-extrabold leading-tight tracking-tight">Sign in with email</span>
-            <span className="text-[13.5px] leading-relaxed text-ink-muted">This is how the Rov and his helpers get in.</span>
+    const form = (
+      <>
+        <Field label="Email">
+          <input className={inputCls} type="email" autoComplete="username" autoFocus={admin}
+            value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label="Password">
+          <input className={inputCls} type="password" autoComplete="current-password"
+            value={password} onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && email && password) emailLogin(); }} />
+        </Field>
+        <BigButton busy={busy} disabled={!email || !password} onClick={emailLogin}>Sign in</BigButton>
+        {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+      </>
+    );
+
+    if (!admin) {
+      return (
+        <Screen tone="surface">
+          <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
+          <div className="px-5 md:px-7 py-6 flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[24px] font-extrabold leading-tight tracking-tight">Sign in with email</span>
+              <span className="text-[13.5px] leading-relaxed text-ink-muted">This is how the Rov and his helpers get in.</span>
+            </div>
+            {form}
           </div>
-          <Field label="Email">
-            <input className={inputCls} type="email" autoComplete="username"
-              value={email} onChange={(e) => setEmail(e.target.value)} />
-          </Field>
-          <Field label="Password">
-            <input className={inputCls} type="password" autoComplete="current-password"
-              value={password} onChange={(e) => setPassword(e.target.value)} />
-          </Field>
-          <BigButton busy={busy} disabled={!email || !password} onClick={emailLogin}>Sign in</BigButton>
-          {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+        </Screen>
+      );
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col bg-graphite md:bg-page md:items-center md:justify-center md:px-6 md:py-10">
+        <div className="w-full flex-1 flex flex-col md:flex-none md:max-w-[940px] md:min-h-[560px]
+          md:grid md:grid-cols-2 md:rounded-2xl md:overflow-hidden md:shadow-lift">
+          <div className="flex-1 bg-graphite px-6 pt-10 pb-8 md:px-9 md:py-10 flex flex-col justify-center gap-6">
+            <div className="w-[54px] h-[54px] rounded-xl bg-indigo grid place-items-center text-[24px] font-extrabold text-white">ר</div>
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[30px] font-extrabold leading-[1.18] text-white text-balance">
+                The Rov's<br />console
+              </span>
+              <span className="text-[14.5px] leading-relaxed text-white/[.62]">
+                Today at a glance, the questions waiting, the diary, and who is asking to see you.
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {['Answer a shailah and it texts them for you', 'Open times without touching a calendar', 'Private questions only you can read'].map((t) => (
+                <div key={t} className="flex items-center gap-3">
+                  <span className="w-[5px] h-[5px] rounded-pill bg-indigo flex-none" />
+                  <span className="text-[13.5px] text-white/[.72]">{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-surface rounded-t-[26px] md:rounded-none px-5 pt-6 pb-7 md:px-9 md:py-10
+            flex flex-col justify-center gap-3.5">
+            <span className="text-[20px] font-extrabold tracking-tight">Sign in</span>
+            {form}
+            <button className="text-[12.5px] font-bold text-ink-muted hover:text-ink transition-colors"
+              onClick={() => { setScreen('welcome'); setError(null); }}>
+              Not the Rov? Sign in with a mobile number
+            </button>
+          </div>
         </div>
-      </Screen>
+      </div>
     );
   }
 
