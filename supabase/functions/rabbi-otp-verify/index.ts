@@ -21,6 +21,16 @@ function syntheticEmail(phone: string): string {
   return `p${phone.replace(/\D/g, "")}@members.rabbi-emanuel.app`;
 }
 
+/** Create the auth account, or recover it if an interrupted earlier signup already made one. */
+async function ensureAuthUser(email: string, phone: string): Promise<string | null> {
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email, email_confirm: true, user_metadata: { rabbi_app: true, phone },
+  });
+  if (!error) return created.user.id;
+  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  return list?.users?.find((u) => u.email === email)?.id ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   const pre = preflight(req);
   if (pre) return pre;
@@ -44,12 +54,31 @@ Deno.serve(async (req: Request) => {
     }
     await admin.from("rabbi_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", rec.id);
 
-    // Existing member?
+    // Existing member, or a contact who has only ever texted in?
     const { data: profile } = await admin.from("rabbi_profiles")
       .select("id, auth_user_id, is_active").eq("phone", dest).maybeSingle();
 
     let email: string;
-    if (profile) {
+    if (profile && !profile.auth_user_id) {
+      // Known to the Rov from a text, but no account yet. Sign them up onto the record he already
+      // has, so their earlier shailos stay theirs instead of landing on a second, emptier person.
+      if (!profile.is_active) return json({ verified: false, error: "account_disabled" }, 403);
+      const fullName = String(signup?.fullName ?? "").trim();
+      const affiliation = String(signup?.affiliation ?? "");
+      if (!fullName || !["shul_member", "beis_hatalmud", "mosdos", "other"].includes(affiliation)) {
+        return json({ verified: true, needsSignup: true });
+      }
+      email = syntheticEmail(dest);
+      const authUserId = await ensureAuthUser(email, dest);
+      if (!authUserId) return json({ verified: false, error: "signup_failed" }, 500);
+      const organisation = String(signup?.organisation ?? "").trim().slice(0, 120) || null;
+      const { error: linkErr2 } = await admin.from("rabbi_profiles").update({
+        auth_user_id: authUserId, full_name: fullName, affiliation,
+        organisation: affiliation === "mosdos" ? organisation : null,
+        phone_verified_at: new Date().toISOString(), role: "community",
+      }).eq("id", profile.id);
+      if (linkErr2) return json({ verified: false, error: linkErr2.message }, 500);
+    } else if (profile) {
       if (!profile.is_active) return json({ verified: false, error: "account_disabled" }, 403);
       const { data: authUser, error } = await admin.auth.admin.getUserById(profile.auth_user_id);
       if (error || !authUser?.user?.email) return json({ verified: false, error: "session_failed" }, 500);
@@ -65,20 +94,8 @@ Deno.serve(async (req: Request) => {
         return json({ verified: true, needsSignup: true });
       }
       email = syntheticEmail(dest);
-      let authUserId: string;
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email, email_confirm: true,
-        user_metadata: { rabbi_app: true, phone: dest },
-      });
-      if (createErr) {
-        // The auth user can exist from an interrupted earlier signup — recover it by email.
-        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        const existing = list?.users?.find((u) => u.email === email);
-        if (!existing) return json({ verified: false, error: "signup_failed" }, 500);
-        authUserId = existing.id;
-      } else {
-        authUserId = created.user.id;
-      }
+      const authUserId = await ensureAuthUser(email, dest);
+      if (!authUserId) return json({ verified: false, error: "signup_failed" }, 500);
       // "Jewish High" tells the Rov far more than "mosdos" does, so the name is kept alongside.
       const organisation = String(signup?.organisation ?? "").trim().slice(0, 120) || null;
       const { error: profErr } = await admin.from("rabbi_profiles").insert({

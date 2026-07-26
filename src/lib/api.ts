@@ -62,7 +62,17 @@ export async function api<T = Record<string, unknown>>(
 export async function otpRequest(phone: string, mode: 'login' | 'signup') {
   const { data, error } = await supabase.functions.invoke('rabbi-otp-request', { body: { phone, mode } });
   if (error) throw new Error(error.message);
-  return data as { ok: boolean; sent: boolean; registered: boolean; error?: string };
+  const res = data as { ok: boolean; sent: boolean; configured?: boolean; registered: boolean; error?: string };
+  // Saying "we've texted you a code" when nothing was sent leaves someone waiting on a text that
+  // is never coming. Say what actually happened instead.
+  if (res.ok && res.sent === false) {
+    throw new Error(
+      res.configured === false
+        ? 'Texts are not set up yet, so a code cannot be sent. Add the TextMagic details in Settings.'
+        : `The code could not be sent${res.error ? `: ${res.error}` : '. Please check the number and try again.'}`,
+    );
+  }
+  return res;
 }
 
 export async function otpVerify(

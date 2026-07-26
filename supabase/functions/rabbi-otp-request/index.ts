@@ -56,6 +56,13 @@ Deno.serve(async (req: Request) => {
     });
 
     const sms = await sendSms(dest, `Your code for Rabbi Yechiel Emanuel is ${code}. It expires in ${Math.round(TTL_SECONDS / 60)} minutes.`);
+    // Logged so a code that never arrives shows up as a failure the Rov can see, rather than as a
+    // person staring at an empty inbox. The code itself is never written down.
+    await admin.from("rabbi_messages").insert({
+      direction: "out", channel: "sms", phone: dest, body: "Sign-in code (not stored)",
+      related_type: "otp", status: sms.ok ? "sent" : "failed",
+      error: sms.configured ? (sms.error ?? null) : "TextMagic is not set up",
+    });
     return json({ ok: true, sent: sms.ok, configured: sms.configured, registered: Boolean(profile), error: sms.error ?? null });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);

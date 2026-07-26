@@ -70,6 +70,40 @@ async function parseInbound(req: Request): Promise<{ from: string; text: string 
  */
 const NO_PROBE = ["niddah", "shalom_bayis", "chinuch"];
 
+/**
+ * Categories and tiers change about once a year, and reading them costs two round trips on the
+ * path a person is sitting waiting on. Hold them for five minutes per warm instance.
+ */
+let refCache: { at: number; cats: { slug: string; name: string }[]; tiers: { slug: string; name: string }[] } | null = null;
+async function loadReference() {
+  if (refCache && Date.now() - refCache.at < 5 * 60_000) return refCache;
+  const [c, t] = await Promise.all([
+    admin.from("rabbi_categories").select("slug, name").eq("is_active", true).order("sort_order"),
+    admin.from("rabbi_urgency_tiers").select("slug, name").eq("is_active", true).order("sort_order"),
+  ]);
+  refCache = { at: Date.now(), cats: c.data ?? [], tiers: t.data ?? [] };
+  return refCache;
+}
+
+/**
+ * The first time someone texts in and gives their name, they become a contact. Next time they
+ * text, the assistant greets them by name and never asks for it again — which also saves a whole
+ * round trip, and a round trip by SMS is half a minute of someone's life. The row carries no
+ * auth_user_id: it is a contact, not an account. If they later sign up with the same number,
+ * rabbi-otp-verify links the new account onto this row rather than making a second person.
+ */
+async function rememberContact(phone: string, name: string): Promise<string | null> {
+  const clean = name.trim().slice(0, 120);
+  if (!clean) return null;
+  const { data } = await admin.from("rabbi_profiles")
+    .insert({ phone, full_name: clean, role: "community", preferred_channel: "sms" })
+    .select("id").maybeSingle();
+  if (data?.id) return data.id;
+  // One already exists for this number — use it rather than making a duplicate.
+  const { data: found } = await admin.from("rabbi_profiles").select("id").eq("phone", phone).maybeSingle();
+  return found?.id ?? null;
+}
+
 const HANDOFF_TEXT = "No problem — the Rov's assistant will call you to sort this out properly. Thank you for texting.";
 const WELCOME_MENU = "This is Rabbi Yechiel Emanuel's assistant. Reply 1 to ask the Rov a question, 2 to book a phone call, 3 to request a meeting. (This service can't answer questions itself — everything goes to the Rov.)";
 
@@ -84,18 +118,21 @@ Deno.serve(async (req: Request) => {
     if (!inbound) return json({ ok: true, ignored: "no sender/text" });
     const { from, text } = inbound;
 
-    const settings = await loadRabbiSettings(admin);
+    // Someone is holding a phone waiting for this reply, so nothing that can be read at the same
+    // time is read one after the other.
+    const [settings, profileRes, existingRes] = await Promise.all([
+      loadRabbiSettings(admin),
+      // Known member or a contact we've met before? (Optional — SMS works fine for strangers too.)
+      admin.from("rabbi_profiles")
+        .select("id, full_name, phone").eq("phone", from).eq("is_active", true).maybeSingle(),
+      // Active conversation or a fresh one.
+      admin.from("rabbi_conversations")
+        .select("*").eq("phone", from).neq("state", "done")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
     const tz = settings.timezone;
-
-    // Known member? (Optional — SMS works fine for strangers too.)
-    const { data: profile } = await admin.from("rabbi_profiles")
-      .select("id, full_name, phone").eq("phone", from).eq("is_active", true).maybeSingle();
-
-    // Active conversation or a fresh one.
-    const { data: existing } = await admin.from("rabbi_conversations")
-      .select("*").eq("phone", from).neq("state", "done")
-      .order("updated_at", { ascending: false }).limit(1).maybeSingle();
-    let conv = existing;
+    const profile = profileRes.data;
+    let conv = existingRes.data;
     if (!conv) {
       const { data: created, error } = await admin.from("rabbi_conversations").insert({
         phone: from, profile_id: profile?.id ?? null, channel: "sms",
@@ -106,25 +143,32 @@ Deno.serve(async (req: Request) => {
       conv = created;
     }
 
-    await admin.from("rabbi_messages").insert({
+    // Logged in the background: it must land before the outgoing reply is written, but nothing
+    // between here and there needs to wait for it.
+    const inboundLogged = admin.from("rabbi_messages").insert({
       conversation_id: conv.id, profile_id: profile?.id ?? null, direction: "in",
       channel: "sms", phone: from, body: text, related_type: "conversation",
       related_id: conv.id, status: "received",
-    });
+    }).then((r) => r);
+
+    let profileId: string | null = profile?.id ?? conv.profile_id ?? null;
 
     const reply = async (body: string, patch: Partial<{ state: ConvState; intent: string | null; draft: Draft; turn_count: number }> = {}) => {
+      // Whoever they turn out to be, they are somebody from now on.
+      if (!profileId && patch.draft?.name) profileId = await rememberContact(from, patch.draft.name);
       await admin.from("rabbi_conversations").update({
         ...("state" in patch ? { state: patch.state } : {}),
         ...("intent" in patch ? { intent: patch.intent } : {}),
         ...(patch.draft !== undefined ? { draft: patch.draft } : {}),
         ...(patch.turn_count !== undefined ? { turn_count: patch.turn_count } : {}),
-        profile_id: profile?.id ?? conv.profile_id ?? null,
+        profile_id: profileId,
         last_inbound_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + CONVERSATION_TTL_MS).toISOString(),
         updated_at: new Date().toISOString(),
       }).eq("id", conv.id);
+      await inboundLogged;
       await sendRabbiMessage(admin, {
-        phone: from, body, conversationId: conv.id, profileId: profile?.id ?? null,
+        phone: from, body, conversationId: conv.id, profileId,
         relatedType: "conversation", relatedId: conv.id, kind: "bot_reply",
       });
       return json({ ok: true });
@@ -262,8 +306,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- AI turn: interpret, collect, draft the next SMS --------------------
-    const catQ = await admin.from("rabbi_categories").select("slug, name, default_same_day").eq("is_active", true).order("sort_order");
-    const tierQ = await admin.from("rabbi_urgency_tiers").select("slug, name").eq("is_active", true).order("sort_order");
+    const ref = await loadReference();
     const offered = draft.offered_slots?.map((s, i) => `${i + 1}) ${fmtSlot(s.startsAt, tz)}`).join("; ") ?? "none";
 
     const system = `You are the SMS assistant for Rabbi Yechiel Emanuel. You help people (often without smartphones) do exactly three things by text: (1) send the Rov a halachic question (a shailah), (2) book a phone call, (3) request a face-to-face meeting.
@@ -313,8 +356,8 @@ CONVERSATION CONTEXT:
       ].filter(Boolean).join("; ") || "nothing \u2014 confirm what you have"
     }
 - numbered slots currently offered: ${offered}
-- shailah categories (slug: name): ${(catQ.data ?? []).map((c) => `${c.slug}: ${c.name}`).join("; ")}
-- urgency tiers (slug: name): ${(tierQ.data ?? []).map((t) => `${t.slug}: ${t.name}`).join("; ")}
+- shailah categories (slug: name): ${ref.cats.map((c) => `${c.slug}: ${c.name}`).join("; ")}
+- urgency tiers (slug: name): ${ref.tiers.map((t) => `${t.slug}: ${t.name}`).join("; ")}
 
 ASKING A USEFUL FOLLOW-UP (this is the point of the service):
 The Rov should be able to answer without ringing back. When someone sends a question, ask for the one or two details he would obviously need — in ONE message, plainly, never a list of forms.
@@ -323,6 +366,9 @@ The Rov should be able to answer without ringing back. When someone sends a ques
  - Shabbos or yom tov: is it for this coming one
  - business: roughly what is at stake and whether the other side is Jewish
  - aveilus: whose, and which day of the aveilus
+ASK FOR ONE THING AT A TIME. Never put a clarifying question and a request for their name in the
+same message: people answer the first half and the second half is lost. If you are asking the
+clarifier, ask only that.
 NEVER probe on these, whatever they say \u2014 take what is offered and go straight to confirming: ${NO_PROBE.join(", ")}. These are private, or about someone\u2019s child. If something is unclear there, say the Rov may ring rather than asking.
 Set "complete": true when you have enough that the Rov could answer without ringing back, or when the category is one of the never-probe ones.
 
@@ -370,8 +416,8 @@ Only include updates fields you learned THIS turn. slot_index must reference the
 
     // Merge validated updates.
     const updates = (parsed.updates ?? {}) as Record<string, unknown>;
-    const catSlugs = new Set((catQ.data ?? []).map((c) => c.slug));
-    const tierSlugs = new Set((tierQ.data ?? []).map((t) => t.slug));
+    const catSlugs = new Set(ref.cats.map((c) => c.slug));
+    const tierSlugs = new Set(ref.tiers.map((t) => t.slug));
     const newDraft: Draft = { ...draft, confused_turns: confusedTurns };
     if (typeof updates.question === "string" && updates.question.trim()) newDraft.question = updates.question.trim().slice(0, 3000);
     if (typeof updates.category_slug === "string" && catSlugs.has(updates.category_slug)) newDraft.category_slug = updates.category_slug;
