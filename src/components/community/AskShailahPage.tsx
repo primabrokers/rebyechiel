@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Mic, Square } from 'lucide-react';
 import { api } from '../../lib/api';
-import { supabase } from '../../lib/supabase';
-import { isDemo } from '../../lib/demo';
 import type { Category, UrgencyTier } from '../../types';
 import {
   BigButton, Choice, Headline, Note, PromisePanel, Screen, Spinner, StepBar, textareaCls,
@@ -24,9 +21,6 @@ export function AskShailahPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ ref: string; expected_reply_text: string } | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
 
   useEffect(() => {
     api<{ categories: Category[]; urgencyTiers: UrgencyTier[] }>('public_config')
@@ -59,51 +53,6 @@ export function AskShailahPage() {
       setError(err instanceof Error ? err.message : 'Something went wrong — please try again.');
     } finally { setBusy(false); }
   };
-
-  // Speaking a shailah instead of typing it: the same transcription the Rov uses to answer.
-  const startRecording = async () => {
-    setError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      const chunks: Blob[] = [];
-      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-      rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-        if (blob.size < 1000) return; // an accidental tap
-        setTranscribing(true);
-        try {
-          if (isDemo()) {
-            setQuestion((p) => (p.trim() ? p.trimEnd() + '\n' : '') +
-              'I was cooking milchig soup and stirred it with a clean meat spoon by mistake — the soup was boiling.');
-            return;
-          }
-          const bytes = new Uint8Array(await blob.arrayBuffer());
-          let binary = '';
-          const CHUNK = 0x8000;
-          for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-          const { data, error: fnErr } = await supabase.functions.invoke('rabbi-transcribe', {
-            body: { audioBase64: btoa(binary), mimeType: blob.type },
-          });
-          if (fnErr || data?.error) throw new Error(data?.error ?? fnErr?.message ?? 'failed');
-          const text = String(data.text ?? '').trim();
-          if (text) setQuestion((p) => (p.trim() ? p.trimEnd() + ' ' + text : text));
-        } catch {
-          setError("Couldn't turn that into words — try again, or type it.");
-        } finally { setTranscribing(false); }
-      };
-      rec.start();
-      setRecorder(rec);
-      setRecording(true);
-    } catch {
-      setError('Microphone not available — check the permission in your browser.');
-    }
-  };
-
-  const stopRecording = () => { recorder?.stop(); setRecorder(null); setRecording(false); };
 
   // --- sent ---------------------------------------------------------------------------------
   if (done) {
@@ -185,26 +134,6 @@ export function AskShailahPage() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
             />
-            <div className="flex gap-2.5">
-              {!recording && !transcribing && (
-                <button onClick={startRecording}
-                  className="flex-1 rounded-md bg-canvas border px-3 py-3 text-[13px] font-bold flex items-center justify-center gap-2">
-                  <Mic size={15} /> Say it instead
-                </button>
-              )}
-              {recording && (
-                <button onClick={stopRecording}
-                  className="flex-1 rounded-md bg-graphite text-white px-3 py-3 text-[13px] font-bold flex items-center justify-center gap-2">
-                  <Square size={12} fill="currentColor" /> Recording — tap to finish
-                </button>
-              )}
-              {transcribing && (
-                <span className="flex-1 rounded-md bg-canvas border px-3 py-3 text-[13px] font-bold flex items-center justify-center gap-2 text-ink-muted">
-                  <Loader2 size={15} className="animate-spin" /> Writing it out…
-                </span>
-              )}
-            </div>
-
             <PromisePanel
               eyebrow="Before you send"
               headline={<>You'll have an answer<br />{preview}.</>}

@@ -52,8 +52,6 @@ Deno.serve(async (req: Request) => {
       await admin.from("rabbi_otp_codes").update({ attempts: rec.attempts + 1 }).eq("id", rec.id);
       return json({ verified: false, error: "invalid_code", attemptsLeft: Math.max(0, MAX_ATTEMPTS - rec.attempts - 1) }, 400);
     }
-    await admin.from("rabbi_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", rec.id);
-
     // Existing member, or a contact who has only ever texted in?
     const { data: profile } = await admin.from("rabbi_profiles")
       .select("id, auth_user_id, is_active").eq("phone", dest).maybeSingle();
@@ -66,6 +64,10 @@ Deno.serve(async (req: Request) => {
       const fullName = String(signup?.fullName ?? "").trim();
       const affiliation = String(signup?.affiliation ?? "");
       if (!fullName || !["shul_member", "beis_hatalmud", "mosdos", "other"].includes(affiliation)) {
+        // The code is deliberately NOT consumed here: nothing has been created yet, and burning it
+        // would make the sign-up screen text a second code for a number that is already proven —
+        // two codes to join, which is how this felt broken. It still expires, and still counts
+        // attempts, so nothing is weakened by letting it finish the job it was sent for.
         return json({ verified: true, needsSignup: true });
       }
       email = syntheticEmail(dest);
@@ -91,6 +93,10 @@ Deno.serve(async (req: Request) => {
       const affiliation = String(signup?.affiliation ?? "");
       if (!fullName || !["shul_member", "beis_hatalmud", "mosdos", "other"].includes(affiliation)) {
         // Verified an unregistered number without signup details — tell the app to collect them.
+        // The code is deliberately NOT consumed here: nothing has been created yet, and burning it
+        // would make the sign-up screen text a second code for a number that is already proven —
+        // two codes to join, which is how this felt broken. It still expires, and still counts
+        // attempts, so nothing is weakened by letting it finish the job it was sent for.
         return json({ verified: true, needsSignup: true });
       }
       email = syntheticEmail(dest);
@@ -107,6 +113,9 @@ Deno.serve(async (req: Request) => {
         return json({ verified: false, error: profErr.message }, 500);
       }
     }
+
+    // Spent only now that it has actually done something.
+    await admin.from("rabbi_otp_codes").update({ consumed_at: new Date().toISOString() }).eq("id", rec.id);
 
     const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
     const props = (link as { properties?: { hashed_token?: string; verification_type?: string } } | null)?.properties;

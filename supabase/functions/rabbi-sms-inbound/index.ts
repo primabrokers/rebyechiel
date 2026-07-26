@@ -40,6 +40,8 @@ interface Draft {
   purpose?: string;
   // shared
   name?: string;
+  /** What it is concerning has been asked once. It is never asked twice. */
+  purpose_asked?: boolean;
   /** One clarifying round has been asked and answered — never ask a second. */
   clarified?: boolean;
   confused_turns?: number;
@@ -69,6 +71,18 @@ async function parseInbound(req: Request): Promise<{ from: string; text: string 
  * by text — take what is offered and let him ask himself, or ring.
  */
 const NO_PROBE = ["niddah", "shalom_bayis", "chinuch"];
+
+/**
+ * "It's private." "I'd rather not say." "It's personal." That IS an answer, and being asked the
+ * same question straight back is the moment somebody decides the service is not for them. Left to
+ * the model this went wrong, so code decides it: a decline is taken as given, and what it is
+ * concerning is asked once and never twice.
+ */
+const DECLINES_RE =
+  /\b(private|personal|confidential|sensitive|delicate|rather not|prefer not|don'?t want to (say|discuss|go into)|not over (text|the phone|sms)|in person|face to face|between me and|say it to him|tell him myself)\b/i;
+const PRIVATE_PURPOSE = "Private — would rather say it to the Rov himself";
+const ASKS_PURPOSE_RE =
+  /\bwhat(?:'s| is| was| it)?\s+(?:it\s+)?(?:concerning|regarding|about|in connection with)\b|may i ask what it/i;
 
 /**
  * Categories and tiers change about once a year, and reading them costs two round trips on the
@@ -318,7 +332,8 @@ WHAT THEY WANT (decide this first, every turn):
 - If they ask for a call AND give a question, it is "call" \u2014 they have told you how they want it dealt with.
 
 FOR A CALL OR A MEETING:
-Ask what it is concerning, in one line, before you offer times \u2014 the Rov wants to know what the call is about before he rings, and a one-line answer is enough ("my son\u2019s school", "a business matter"). Put it in "purpose". Do not press for detail: if they would rather not say, that is fine, use "would rather say on the phone" and carry on.
+Ask what it is concerning ONCE, in one line \u2014 the Rov wants to know what the call is about before he rings, and a one-line answer is enough ("my son\u2019s school", "a business matter"). Put it in "purpose".
+"It's private", "personal", "I'd rather not say", "I'll tell him myself" IS THE ANSWER. Accept it warmly \u2014 "of course, that's between you and the Rov" \u2014 put "private" in "purpose" and move straight on to the times. Asking a second time after somebody has said it is private is the worst thing this service can do. You get one ask, and only if they said nothing about it at all.
 
 HOW URGENT \u2014 never ask them to pick a word:
 Do NOT write "urgent, soon or standard", or offer the tier names in any form. They are labels for
@@ -433,8 +448,23 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     let intent = conv.intent as string | null;
     if (typeof parsed.intent === "string" && ["shailah", "call", "meeting"].includes(parsed.intent)) intent = parsed.intent;
     let replyText = String(parsed.reply).slice(0, 480);
+
+    // What it is concerning: asked once, taken as answered whatever comes back. Somebody who says
+    // "it's private" has told the Rov what he needs to know — that it is not one for the phone.
+    if (intent === "call" || intent === "meeting") {
+      if (!newDraft.purpose) {
+        if (DECLINES_RE.test(text) || draft.purpose_asked) newDraft.purpose = PRIVATE_PURPOSE;
+        else newDraft.purpose_asked = true;
+      }
+    }
+
+    // Somebody who asked about a meeting and then said "what about a call" must be offered call
+    // times, not the meeting times already on the table.
+    const wantType = intent === "meeting" ? "meeting" : "call";
+    const wrongType = Boolean(newDraft.offered_slots?.length) && newDraft.slot_type !== wantType;
+    if (wrongType) { newDraft.offered_slots = undefined; newDraft.slot_index = undefined; }
     if (nextState === "collecting_booking" && !newDraft.offered_slots?.length) {
-      const slotType = intent === "meeting" ? "meeting" : "call";
+      const slotType = wantType;
       const slots = (await expandSlots(admin, slotType, tz, 60, settings.erev_cutoff_minutes ?? 90)).slice(0, MAX_SLOTS_OFFERED);
       if (!slots.length) {
         return await reply(
@@ -476,6 +506,14 @@ Only include updates fields you learned THIS turn. slot_index must reference the
         : `Thank you \u2014 I have your question. What name should I put on it?`;
     } else if (who && asksForName.test(replyText)) {
       replyText = `Thank you ${who.split(" ")[0]}. I have what I need \u2014 putting it to the Rov now.`;
+    } else if (newDraft.purpose && ASKS_PURPOSE_RE.test(replyText)) {
+      const menu = newDraft.offered_slots?.length && !newDraft.slot_index
+        ? "\n" + newDraft.offered_slots.map((s, i) => `${i + 1}) ${fmtSlot(s.startsAt, tz)}`).join("\n")
+          + "\nReply with the number you'd like."
+        : "";
+      replyText = newDraft.purpose === PRIVATE_PURPOSE
+        ? `Of course \u2014 that stays between you and the Rov, I won\u2019t ask again.${menu || " I\u2019ll find you a time."}`
+        : `Thank you.${menu || " I\u2019ll get that arranged."}`;
     }
 
     let finalState: ConvState = nextState;

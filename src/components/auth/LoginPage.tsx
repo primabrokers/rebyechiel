@@ -77,7 +77,9 @@ export function LoginPage() {
     setBusy(true); setError(null);
     try {
       const res = await otpVerify(ukNumber(phone), code);
-      if (res.needsSignup) { nav('/signup', { state: { phone: ukNumber(phone), verified: true } }); return; }
+      // The number is proven and the code is still good — carry both across so joining doesn't
+      // mean sitting through a second text.
+      if (res.needsSignup) { nav('/signup', { state: { phone: ukNumber(phone), verified: true, code } }); return; }
       nav('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';

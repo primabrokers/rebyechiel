@@ -32,7 +32,7 @@ export function SignUpPage() {
   const { refreshProfile } = useAuth();
   // Arriving from the sign-in screen after verifying an unregistered number: the number is
   // already proven, so all that is left is who they are.
-  const preVerified = location.state as { phone?: string; verified?: boolean } | null;
+  const preVerified = location.state as { phone?: string; verified?: boolean; code?: string } | null;
 
   const [step, setStep] = useState(0);
   const [fullName, setFullName] = useState('');
@@ -40,8 +40,10 @@ export function SignUpPage() {
   const [organisation, setOrganisation] = useState('');
   const [method, setMethod] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState(preVerified?.phone ?? '');
-  const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState(preVerified?.code ?? '');
+  // Arriving from sign-in with the number already proven: they have done the code once, and
+  // asking them to do it again is asking them to join twice.
+  const [codeSent, setCodeSent] = useState(Boolean(preVerified?.verified && preVerified?.code));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -167,11 +169,20 @@ export function SignUpPage() {
             </>
           ) : (
             <>
-              <Field label={`Enter the code we texted to ${ukNumber(phone)}`}>
-                <input className={inputCls + ' text-center font-mono text-[22px] font-bold tracking-[0.35em]'}
-                  type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="——————"
-                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-              </Field>
+              {preVerified?.verified ? (
+                <div className="rounded-md bg-good-bg border border-good/30 px-4 py-3.5 flex flex-col gap-1">
+                  <span className="text-[13px] font-extrabold text-good">✓ {ukNumber(phone)} is confirmed</span>
+                  <span className="text-[12.5px] leading-snug text-ink-soft">
+                    You've already done the code — there's nothing more to enter.
+                  </span>
+                </div>
+              ) : (
+                <Field label={`Enter the code we texted to ${ukNumber(phone)}`}>
+                  <input className={inputCls + ' text-center font-mono text-[22px] font-bold tracking-[0.35em]'}
+                    type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="——————"
+                    value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+                </Field>
+              )}
               <BigButton busy={busy} disabled={code.length < 6 || !detailsOk} onClick={verifyAndCreate}>
                 Create my account
               </BigButton>

@@ -8,27 +8,30 @@ import { getSecret } from "../_shared/getSecret.ts";
  * this returns the text, and he edits/sends it — typing is the part he hates, not talking.
  *
  * Model: gpt-4o-mini-transcribe (~$0.003/min — a 2-minute answer costs about half a penny).
- * Admin-only: community users never hit this.
+ *
+ * The Rov and nobody else. Half a penny a time is nothing for the handful of answers he dictates
+ * in a day; the same button in front of a whole kehillah is a bill with no ceiling on it. The gate
+ * is here rather than in the screen, because a hidden button is not a gate.
  */
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024; // ~15 MB ≈ a very long voice note
 
-async function isAdmin(req: Request): Promise<boolean> {
+async function callerIsRov(req: Request): Promise<boolean> {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return false;
   const { data } = await admin.auth.getUser(token);
   if (!data?.user) return false;
   const { data: profile } = await admin.from("rabbi_profiles")
     .select("role, is_active").eq("auth_user_id", data.user.id).maybeSingle();
-  return Boolean(profile?.is_active && ["rabbi", "assistant"].includes(profile.role));
+  return profile?.role === "rabbi" && profile?.is_active === true;
 }
 
 Deno.serve(async (req: Request) => {
   const pre = preflight(req);
   if (pre) return pre;
   try {
-    if (!(await isAdmin(req))) return json({ error: "forbidden" }, 403);
+    if (!(await callerIsRov(req))) return json({ error: "forbidden" }, 403);
     const apiKey = await getSecret("OPENAI_API_KEY");
     if (!apiKey) return json({ error: "transcription_not_configured" }, 503);
 
