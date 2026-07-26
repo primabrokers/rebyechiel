@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #F6F3ED;
+  color: #1C2026;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile viewport lock: no pull-to-refresh rubber-banding, and full-height layouts track the
+   visible viewport (100vh overshoots when browser chrome or the keyboard is up). */
+html, body {
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@supports (height: 100dvh) {
+  .h-screen { height: 100dvh; }
+  .min-h-screen { min-height: 100dvh; }
+}
+
+:focus-visible {
+  outline: 2px solid #2E5382;
+  outline-offset: 2px;
+}
+
+/* The rabbi shell runs bigger type throughout — he shouldn't need his reading glasses. */
+.rabbi-shell { font-size: 18px; }
+
+/* Gradient masthead + glass briefing card (design v2, Rov's Today screen). */
+.masthead {
+  background: linear-gradient(155deg, #0C1930 0%, #16294A 55%, #274B7E 130%);
+}
+.glass-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Red priority spine on same-day / overdue tickets. */
+.priority-spine {
+  position: relative;
+  overflow: hidden;
+}
+.priority-spine::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, #A33224, #D96A4F);
+}

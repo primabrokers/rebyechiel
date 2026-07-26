@@ -1,0 +1,16 @@
+{
+  "name": "Rabbi Emanuel's Assistant",
+  "short_name": "Rabbi Emanuel",
+  "description": "Ask Rabbi Yechiel Emanuel a shailah, book a phone call or arrange a meeting.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F3ED",
+  "theme_color": "#0F1E33",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

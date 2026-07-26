@@ -1,0 +1,17 @@
+project_id = "neiqcssajyivkbfjcaet"
+
+# Rabbi Emanuel's Assistant — standalone Supabase project (not part of Prima CRM).
+# This file contains no secrets.
+
+# Called by TextMagic's servers when someone texts the inbound number — carries no Supabase JWT.
+# The function authenticates each request itself via the RABBI_SMS_WEBHOOK_SECRET query parameter.
+[functions.rabbi-sms-inbound]
+verify_jwt = false
+
+# Invoked by pg_cron via public.trigger_edge_function with the x-cron-secret header (no JWT).
+# Both functions enforce their own auth via CRON_INTERNAL_SECRET (see _shared/rabbiCronAuth.ts).
+[functions.rabbi-daily-brief]
+verify_jwt = false
+
+[functions.rabbi-notify]
+verify_jwt = false
