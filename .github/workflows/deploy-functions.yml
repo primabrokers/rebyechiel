@@ -1,0 +1,46 @@
+# Deploys the edge functions whenever they change on main.
+#
+# Until now every function was deployed by hand, which meant the repo and the running code drifted
+# apart — a fix could be committed, reviewed and pushed while the live site carried on running the
+# old build. Pushing to main is now the only step.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  — a personal access token from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   — neiqcssajyivkbfjcaet
+name: Deploy edge functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-functions.yml'
+  # So a deploy can be forced without an empty commit.
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy every function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          # config.toml carries the verify_jwt settings, so the webhook and cron functions keep
+          # authenticating themselves rather than demanding a JWT they will never be given.
+          supabase functions deploy --project-ref "$PROJECT_REF"
+
+      - name: Refresh the Jewish calendar
+        # The deploy replaces the running code; this makes sure the calendar cache matches it.
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: echo "Calendar refreshes on its own schedule at 02:20 UTC; nothing to do here."
