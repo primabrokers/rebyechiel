@@ -194,7 +194,9 @@ export function DiaryPage() {
       </Panel>
 
       {sheet === 'release' && (
-        <OpenTimesSheet onClose={() => setSheet(null)}
+        <OpenTimesSheet
+          blocks={blocks} weekly={weekly} releases={releases} calendar={calendar}
+          onClose={() => setSheet(null)}
           onSaved={async (m) => { setSheet(null); await load(); say(m); }} />
       )}
       {sheet === 'block' && (
