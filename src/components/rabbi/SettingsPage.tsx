@@ -7,6 +7,7 @@ import type { Category, Settings } from '../../types';
 import { Btn, Field, Panel, Spinner, Toast, Toggle, inputCls } from '../shared/ui';
 import { format } from 'date-fns';
 import { useAuth } from '../../lib/auth';
+import { ConnectionsPanel } from './ConnectionsPanel';
 
 /**
  * Plain switches in plain words. Every change saves itself and says so — there is no Save button
@@ -194,6 +195,10 @@ export function SettingsPage() {
             onBlur={(e) => patch({ rabbi_phone: e.target.value.trim() || null }, 'Saved.')} />
         </Field>
       </Panel>
+
+      {profile?.role === 'rabbi' && (
+        <ConnectionsPanel rabbiPhone={settings.rabbi_phone} say={say} />
+      )}
 
       <Panel className="px-5 py-1">
         <div className="py-4 flex flex-col gap-3">
