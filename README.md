@@ -10,8 +10,9 @@ morning briefing. Installable as a PWA on Android and iOS.
 - **Front end**: React 18 + Vite + TypeScript + Tailwind (repo root). Deployed on Vercel.
 - **Back end**: Supabase project `neiqcssajyivkbfjcaet` — Postgres (all tables `rabbi_`-prefixed,
   RLS throughout), Auth, and Deno edge functions in `supabase/functions/`.
-- **SMS**: TextMagic. **AI**: Anthropic Claude (triage, SMS bot, briefing) and OpenAI
-  (voice-note transcription, `gpt-4o-mini-transcribe`).
+- **SMS**: TextMagic. **AI**: OpenAI throughout — one account, one key, one bill:
+  `gpt-5.4-nano` for shailah triage, `gpt-5.4-mini` for the SMS assistant and the morning
+  briefing, `gpt-4o-mini-transcribe` for voice-note answers.
 
 ## Local development
 
@@ -38,8 +39,11 @@ npm run dev
 | Name | Purpose |
 |---|---|
 | `TEXTMAGIC_USERNAME` / `TEXTMAGIC_API_KEY` / `TEXTMAGIC_SENDER` | Outbound SMS |
-| `ANTHROPIC_API_KEY` | AI triage, SMS bot, daily briefing |
-| `OPENAI_API_KEY` | Voice-note transcription |
+| `OPENAI_API_KEY` | Everything AI: triage, SMS assistant, morning briefing, voice notes |
+
+The named rows already exist (empty) in the database vault, so they can be filled in from
+Database → Vault, or with `UPDATE vault.secrets SET secret = '…' WHERE name = '…';`. An empty
+value is treated as "not configured" and the feature simply stays off.
 
 Stored in the database vault (already set): `project_url`, `cron_internal_secret`,
 `RABBI_SMS_WEBHOOK_SECRET`.

@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { json } from "../_shared/cors.ts";
 import { getSecret } from "../_shared/getSecret.ts";
-import { callClaude, MODELS } from "../_shared/anthropic.ts";
+import { callOpenAI, MODELS, parseJsonReply } from "../_shared/openai.ts";
 import { normalizePhone } from "../_shared/textmagic.ts";
 import { sendRabbiMessage } from "../_shared/rabbiMessaging.ts";
 import {
@@ -16,7 +16,7 @@ import {
  * .../functions/v1/rabbi-sms-inbound?secret=<RABBI_SMS_WEBHOOK_SECRET>; the function is
  * verify_jwt=false, so the secret is the only gate — requests without it are rejected).
  *
- * Design: a DETERMINISTIC state machine owns the conversation; Claude only interprets the
+ * Design: a DETERMINISTIC state machine owns the conversation; the model only interprets the
  * caller's words and drafts the next reply. The model proposes {reply, next_state, updates};
  * code validates every transition and every field, and only code writes shailos/bookings —
  * through the same _shared/rabbiCore.ts paths as the app. The model is instructed to never
@@ -42,12 +42,6 @@ interface Draft {
   name?: string;
   confused_turns?: number;
   offered_slots?: SlotOut[];
-}
-
-function extractJson(text: string): Record<string, unknown> | null {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]); } catch { return null; }
 }
 
 // TextMagic posts JSON or form-encoded depending on configuration; accept both.
@@ -286,13 +280,14 @@ Reply with STRICT JSON only:
 {"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "confused": false}
 Only include updates fields you learned THIS turn. slot_index must reference the numbered slots in CONTEXT.`;
 
-    const ai = await callClaude({
-      model: MODELS.haiku,
+    const ai = await callOpenAI({
+      model: MODELS.mini,
       maxTokens: 500,
       system,
+      json: true,
       messages: [{ role: "user", content: text.slice(0, 1500) }],
     });
-    const parsed = extractJson(ai.text);
+    const parsed = parseJsonReply(ai.text);
 
     if (!parsed || typeof parsed.reply !== "string") {
       return await reply(WELCOME_MENU, { state: "intent", turn_count: (conv.turn_count ?? 0) + 1 });

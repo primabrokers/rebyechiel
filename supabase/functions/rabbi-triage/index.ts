@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { preflight, json } from "../_shared/cors.ts";
-import { callClaude, MODELS } from "../_shared/anthropic.ts";
+import { callOpenAI, MODELS, parseJsonReply } from "../_shared/openai.ts";
 
 /**
  * AI triage for incoming shailos. Suggests category + urgency + a short summary; the rabbi
@@ -23,13 +23,6 @@ async function isAuthorised(req: Request): Promise<boolean> {
   const { data: profile } = await admin.from("rabbi_profiles")
     .select("role, is_active").eq("auth_user_id", data.user.id).maybeSingle();
   return Boolean(profile?.is_active && ["rabbi", "assistant"].includes(profile.role));
-}
-
-// Pull the first JSON object out of a model reply that may carry stray prose or fences.
-function extractJson(text: string): Record<string, unknown> | null {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try { return JSON.parse(match[0]); } catch { return null; }
 }
 
 Deno.serve(async (req: Request) => {
@@ -70,13 +63,14 @@ Rules:
 
 Reply with STRICT JSON only, no prose: {"category": "<slug>", "urgency": "<slug>", "sensitive": true|false, "summary": "<string>", "confidence": <number>}`;
 
-    const result = await callClaude({
-      model: MODELS.haiku,
+    const result = await callOpenAI({
+      model: MODELS.nano,
       maxTokens: 300,
       system,
+      json: true,
       messages: [{ role: "user", content: shailah.question.slice(0, 4000) }],
     });
-    const parsed = extractJson(result.text);
+    const parsed = parseJsonReply(result.text);
     if (!parsed) return json({ error: "unparseable_ai_reply", raw: result.text.slice(0, 200) }, 502);
 
     const category = (categories ?? []).find((c) => c.slug === parsed.category) ?? null;

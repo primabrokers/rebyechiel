@@ -2,14 +2,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { preflight, json } from "../_shared/cors.ts";
 import { isCronAuthorised } from "../_shared/rabbiCronAuth.ts";
-import { callClaude, MODELS } from "../_shared/anthropic.ts";
+import { callOpenAI, MODELS } from "../_shared/openai.ts";
 import { atLocalHour, localParts } from "../_shared/rabbiEta.ts";
 import { sendRabbiMessage } from "../_shared/rabbiMessaging.ts";
 
 /**
  * Rabbi Emanuel's morning briefing. Cron-triggered each morning (see rabbi crons migration):
  * gathers today's fixed timetable, confirmed bookings, questions due today and anything overdue,
- * has Claude write a short warm summary, stores it (surfaced on the Today screen) and texts it
+ * has the model write a short warm summary, stores it (surfaced on the Today screen) and texts it
  * to the rabbi if enabled. Idempotent per day — a second invocation is a no-op.
  */
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -75,8 +75,8 @@ Deno.serve(async (req: Request) => {
 
     const system = `You write Rabbi Yechiel Emanuel's private morning briefing. Audience: the rabbi himself, on his phone. Style: warm, respectful, extremely clear, plain English with familiar frum terminology, no exclamation marks. Structure: one short greeting line, then short labelled lines (Schedule / Appointments / Questions). Mention overdue questions plainly if there are any — he wants to know. Keep the whole thing under 120 words. Never include the content of any private matter beyond what you are given. Output plain text only.`;
 
-    const result = await callClaude({
-      model: MODELS.sonnet,
+    const result = await callOpenAI({
+      model: MODELS.mini,
       maxTokens: 400,
       system,
       messages: [{ role: "user", content: JSON.stringify(facts, null, 2) }],
