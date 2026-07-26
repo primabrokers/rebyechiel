@@ -210,6 +210,79 @@ export function fmtSlot(iso: string, tz: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Shabbos and yom tov, as they matter to somebody texting in.
+
+export interface RestWindow {
+  /** "soon" — candle lighting is close. "in" — it has already come in. */
+  phase: "soon" | "in";
+  /** What to call it: "Shabbos", or a yom tov by its own name. */
+  label: string;
+  /** Minutes until candle lighting ("soon"), or until it goes out ("in"). */
+  minutes: number;
+  /** When he is back, in the words a person would use: "after Shabbos tonight". */
+  backWhen: string;
+}
+
+/**
+ * Somebody texting a shailah forty minutes before candle lighting is owed the truth: the Rov is
+ * about to be away from a phone for twenty-five hours, and an answer is very unlikely to come
+ * before then. Saying so costs one sentence. Not saying it leaves a person watching a handset
+ * through hadlokas neiros, which is precisely the anxiety this service exists to end.
+ *
+ * Returns null whenever there is nothing to say — which is almost all of the time.
+ */
+export async function restWindow(
+  admin: SupabaseClient, tz: string, withinMinutes = 60, now = new Date(),
+): Promise<RestWindow | null> {
+  const from = localDateKey(new Date(now.getTime() - 2 * 86_400_000), tz);
+  const to = localDateKey(new Date(now.getTime() + 3 * 86_400_000), tz);
+  const { data } = await admin.from("rabbi_calendar_days")
+    .select("on_date, kind, label, no_work, candles_at, havdalah_at")
+    .gte("on_date", from).lte("on_date", to).order("on_date");
+  const days = data ?? [];
+  if (!days.length) return null;
+
+  const nowMs = now.getTime();
+
+  // Already in it: past a candle lighting, and the havdalah that closes it is still ahead.
+  for (const d of days) {
+    if (!d.candles_at) continue;
+    const inAt = Date.parse(String(d.candles_at));
+    const closing = days.find((x) => x.havdalah_at && Date.parse(String(x.havdalah_at)) > inAt);
+    if (!closing) continue;
+    const outAt = Date.parse(String(closing.havdalah_at));
+    if (nowMs >= inAt && nowMs < outAt) {
+      return {
+        phase: "in",
+        label: restLabel(closing),
+        minutes: Math.round((outAt - nowMs) / 60_000),
+        backWhen: `after ${restLabel(closing)}`,
+      };
+    }
+  }
+
+  // Not in it yet: is it close enough to matter?
+  const nextCandles = days
+    .filter((d) => d.candles_at && Date.parse(String(d.candles_at)) > nowMs)
+    .sort((a, b) => Date.parse(String(a.candles_at)) - Date.parse(String(b.candles_at)))[0];
+  if (!nextCandles) return null;
+  const inAt = Date.parse(String(nextCandles.candles_at));
+  const minutes = Math.round((inAt - nowMs) / 60_000);
+  if (minutes > withinMinutes) return null;
+
+  const rest = days.find((x) => x.no_work && Date.parse(String(x.on_date)) >= Date.parse(String(nextCandles.on_date)));
+  const label = rest ? restLabel(rest) : "Shabbos";
+  return { phase: "soon", label, minutes, backWhen: `after ${label}` };
+}
+
+/** "Shabbos Eikev" is for the diary. Somebody texting just needs "Shabbos". */
+function restLabel(day: { kind?: string | null; label?: string | null }): string {
+  if (day.kind === "shabbos") return "Shabbos";
+  const l = (day.label ?? "").trim();
+  return l && day.kind !== "shabbos" ? l : "Yom Tov";
+}
+
+// ---------------------------------------------------------------------------
 // Creation paths shared by app and SMS bot.
 export interface CreateShailahInput {
   profileId?: string | null;

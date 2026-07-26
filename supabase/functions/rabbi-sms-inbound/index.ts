@@ -6,8 +6,8 @@ import { callOpenAI, MODELS, parseJsonReply } from "../_shared/openai.ts";
 import { normalizePhone } from "../_shared/textmagic.ts";
 import { sendRabbiMessage } from "../_shared/rabbiMessaging.ts";
 import {
-  createBooking, createShailah, expandSlots, fireTriage, fmtSlot, loadRabbiSettings,
-  type SlotOut,
+  createBooking, createShailah, expandSlots, fireTriage, fmtSlot, loadRabbiSettings, restWindow,
+  type RestWindow, type SlotOut,
 } from "../_shared/rabbiCore.ts";
 
 /**
@@ -44,6 +44,8 @@ interface Draft {
   purpose_asked?: boolean;
   /** One clarifying round has been asked and answered — never ask a second. */
   clarified?: boolean;
+  /** They have been told Shabbos is nearly in. Saying it twice is nagging. */
+  rest_notice_sent?: boolean;
   confused_turns?: number;
   offered_slots?: SlotOut[];
 }
@@ -143,6 +145,24 @@ const STATUS_RE =
 const CANCEL_RE =
   /\b(cancel|call it off|can'?t make it|cannot make it|won'?t be able to (make|come|be there)|need to (cancel|rearrange|reschedule|move)|move my (appointment|meeting|call|time)|something'?s come up)\b/i;
 
+/** How close to candle lighting counts as "he may not get to this". One hour. */
+const REST_NOTICE_MINUTES = 60;
+
+/**
+ * The sentence added when Shabbos or yom tov is nearly in. It is the truth, said plainly and
+ * once: he is about to be away from a phone, and watching a handset through hadlokas neiros for
+ * an answer that cannot come is exactly the worry this service is meant to take off people.
+ */
+function restNotice(r: RestWindow): string {
+  if (r.phase === "in") {
+    return ` It's ${r.label} now, so the Rov won't see this until it's out — but it's safely with him for then.`;
+  }
+  const when = r.minutes <= 1 ? "any minute now"
+    : r.minutes < 60 ? `in about ${r.minutes} minutes`
+      : "within the hour";
+  return ` Candle lighting is ${when}, so the Rov may well not get to this before ${r.label} — expect him ${r.backWhen}.`;
+}
+
 const HANDOFF_TEXT = "No problem — the Rov's assistant will call you to sort this out properly. Thank you for texting.";
 const WELCOME_MENU = "This is Rabbi Yechiel Emanuel's assistant. Reply 1 to ask the Rov a question, 2 to book a phone call, 3 to request a meeting. (This service can't answer questions itself — everything goes to the Rov.)";
 
@@ -159,8 +179,9 @@ Deno.serve(async (req: Request) => {
 
     // Someone is holding a phone waiting for this reply, so nothing that can be read at the same
     // time is read one after the other.
-    const [settings, profileRes, existingRes] = await Promise.all([
-      loadRabbiSettings(admin),
+    const settingsP = loadRabbiSettings(admin);
+    const [settings, profileRes, existingRes, rest] = await Promise.all([
+      settingsP,
       // Known member or a contact we've met before? (Optional — SMS works fine for strangers too.)
       admin.from("rabbi_profiles")
         .select("id, full_name, phone").eq("phone", from).eq("is_active", true).maybeSingle(),
@@ -168,6 +189,8 @@ Deno.serve(async (req: Request) => {
       admin.from("rabbi_conversations")
         .select("*").eq("phone", from).neq("state", "done")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+      // Only this one has to wait for the settings, for the timezone.
+      settingsP.then((s) => restWindow(admin, s.timezone, REST_NOTICE_MINUTES)).catch(() => null),
     ]);
     const tz = settings.timezone;
     const profile = profileRes.data;
@@ -192,9 +215,19 @@ Deno.serve(async (req: Request) => {
 
     let profileId: string | null = profile?.id ?? conv.profile_id ?? null;
 
-    const reply = async (body: string, patch: Partial<{ state: ConvState; intent: string | null; draft: Draft; turn_count: number }> = {}) => {
+    const reply = async (bodyIn: string, patch: Partial<{ state: ConvState; intent: string | null; draft: Draft; turn_count: number }> = {}) => {
       // Whoever they turn out to be, they are somebody from now on.
       if (!profileId && patch.draft?.name) profileId = await rememberContact(from, patch.draft.name);
+
+      // Shabbos is nearly in. Said once, on the first reply of the conversation that falls inside
+      // the window — after that they know, and repeating it is nagging somebody who is busy.
+      let body = bodyIn;
+      const held = (patch.draft ?? conv.draft ?? {}) as Draft;
+      if (rest && !held.rest_notice_sent) {
+        body += restNotice(rest);
+        patch = { ...patch, draft: { ...held, rest_notice_sent: true } };
+      }
+
       await admin.from("rabbi_conversations").update({
         ...("state" in patch ? { state: patch.state } : {}),
         ...("intent" in patch ? { intent: patch.intent } : {}),
@@ -237,14 +270,14 @@ Deno.serve(async (req: Request) => {
           relatedType: "conversation", relatedId: conv.id, kind: "emergency_alert",
         }).catch(() => {});
       }
-      return await reply(EMERGENCY_TEXT, { state: "handed_off", draft: { ...draft, confused_turns: 0 } });
+      return await reply(EMERGENCY_TEXT, { state: "handed_off", draft: { ...draft, confused_turns: 0, rest_notice_sent: true } });
     }
 
     // "Thank you" ends a conversation. It has never once meant "show me the menu".
     if (THANKS_RE.test(text) && (state === "idle" || state === "intent" || state === "done")) {
       return await reply(
         knownName() ? `You're very welcome, ${knownName()!.split(" ")[0]}. Text any time.` : "You're very welcome. Text any time.",
-        { state: "done" },
+        { state: "done", draft: { ...draft, rest_notice_sent: true } },
       );
     }
 
