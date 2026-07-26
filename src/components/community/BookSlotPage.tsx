@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { Slot } from '../../types';
 import {
-  BigButton, Choice, EmptyState, Headline, Note, Phone, PromisePanel, Spinner, StepBar, textareaCls,
+  BigButton, Choice, EmptyState, Headline, Note, PromisePanel, Screen, Spinner, StepBar, textareaCls,
 } from '../shared/ui';
 import { fmtSlot } from '../../lib/format';
 
@@ -53,8 +53,8 @@ export function BookSlotPage() {
   if (done) {
     const confirmed = done.status === 'confirmed';
     return (
-      <Phone tone="surface">
-        <div className="flex-1 px-6 pt-16 flex flex-col gap-5">
+      <Screen tone="surface">
+        <div className="flex-1 px-6 md:px-7 pt-16 md:pt-12 flex flex-col gap-5">
           <div className={'w-[62px] h-[62px] rounded-xl grid place-items-center text-[26px] text-white ' +
             (confirmed ? 'bg-good' : 'bg-graphite')}>
             {type === 'call' ? '☎︎' : '◍'}
@@ -71,18 +71,18 @@ export function BookSlotPage() {
             sub={<>Your reference is <b className="font-mono">{done.ref}</b>.</>}
           />
         </div>
-        <div className="px-5 pb-7">
+        <div className="px-5 md:px-7 pb-7 md:pb-8">
           <BigButton onClick={() => nav('/')}>Back to home</BigButton>
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   return (
-    <Phone tone="surface">
+    <Screen tone="surface">
       <StepBar onBack={() => nav('/')} />
 
-      <div className="px-5 py-4 flex flex-col gap-3.5">
+      <div className="px-5 md:px-7 py-4 flex flex-col gap-3.5">
         <Headline
           title={type === 'call' ? 'Book a phone call' : 'Ask to meet'}
           sub={type === 'call'
@@ -129,7 +129,7 @@ export function BookSlotPage() {
       </div>
 
       {chosen && (
-        <div className="mt-auto px-5 pt-3 pb-7 flex flex-col gap-2">
+        <div className="mt-auto px-5 md:px-7 pt-3 pb-7 md:pb-8 flex flex-col gap-2">
           <BigButton busy={busy} onClick={book}>
             {type === 'call' ? `Book ${fmtSlot(chosen.startsAt)}` : `Ask for ${fmtSlot(chosen.startsAt)}`}
           </BigButton>
@@ -138,6 +138,6 @@ export function BookSlotPage() {
           </span>
         </div>
       )}
-    </Phone>
+    </Screen>
   );
 }

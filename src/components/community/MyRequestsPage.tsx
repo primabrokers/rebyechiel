@@ -6,7 +6,7 @@ import { demoBookings, demoInvitations, demoMyShailos, isDemo } from '../../lib/
 import { api } from '../../lib/api';
 import { OCCASION_LABELS, type Booking, type Invitation, type Shailah } from '../../types';
 import {
-  BigButton, Chip, EmptyState, Eyebrow, Headline, Mono, Phone, PromisePanel, Spinner, StepBar,
+  BigButton, Chip, EmptyState, Eyebrow, Headline, Mono, PromisePanel, Screen, Spinner, StepBar,
   type ChipTone,
 } from '../shared/ui';
 import { fmtDate, fmtSlot } from '../../lib/format';
@@ -54,14 +54,14 @@ export function MyRequestsPage() {
       .then(({ data }) => setInvitations((data as Invitation[]) ?? []));
   }, []);
 
-  if (!shailos || !bookings || !invitations) return <Phone><Spinner /></Phone>;
+  if (!shailos || !bookings || !invitations) return <Screen width="md"><Spinner /></Screen>;
 
   const nothing = !shailos.length && !bookings.length && !invitations.length;
 
   return (
-    <Phone>
+    <Screen width="md">
       <StepBar onBack={() => nav('/')} />
-      <div className="px-5 py-4 flex flex-col gap-3">
+      <div className="px-5 md:px-7 py-4 flex flex-col gap-3">
         <Headline title="Where things stand" />
 
         {nothing && (
@@ -127,7 +127,7 @@ export function MyRequestsPage() {
           );
         })}
       </div>
-    </Phone>
+    </Screen>
   );
 }
 
@@ -144,8 +144,8 @@ export function RequestDetailPage() {
       .then(({ data }) => setShailah((data as Shailah | null) ?? null));
   }, [id]);
 
-  if (shailah === undefined) return <Phone><Spinner /></Phone>;
-  if (shailah === null) return <Phone><EmptyState title="Not found" /></Phone>;
+  if (shailah === undefined) return <Screen width="md"><Spinner /></Screen>;
+  if (shailah === null) return <Screen width="md"><EmptyState title="Not found" /></Screen>;
 
   const withdraw = async () => {
     setBusy(true);
@@ -158,10 +158,10 @@ export function RequestDetailPage() {
   const answered = shailah.status === 'answered' || shailah.status === 'closed';
 
   return (
-    <Phone>
+    <Screen width="md">
       <StepBar onBack={() => nav('/requests')} right={<Mono className="text-[11.5px]">{shailah.ref}</Mono>} />
 
-      <div className="px-5 py-4 flex flex-col gap-3.5">
+      <div className="px-5 md:px-7 py-4 flex flex-col gap-3.5">
         {answered && (
           <div className="flex items-center gap-2.5">
             <span className="w-[9px] h-[9px] rounded-pill bg-good flex-none" />
@@ -211,6 +211,6 @@ export function RequestDetailPage() {
           </>
         )}
       </div>
-    </Phone>
+    </Screen>
   );
 }

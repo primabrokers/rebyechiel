@@ -62,7 +62,7 @@ async function parseInbound(req: Request): Promise<{ from: string; text: string 
 }
 
 const HANDOFF_TEXT = "No problem — the Rov's assistant will call you to sort this out properly. Thank you for texting.";
-const WELCOME_MENU = "This is Rabbi Emanuel's assistant. Reply 1 to ask the Rov a question, 2 to book a phone call, 3 to request a meeting. (This service can't answer questions itself — everything goes to the Rov.)";
+const WELCOME_MENU = "This is Rabbi Yechiel Emanuel's assistant. Reply 1 to ask the Rov a question, 2 to book a phone call, 3 to request a meeting. (This service can't answer questions itself — everything goes to the Rov.)";
 
 Deno.serve(async (req: Request) => {
   try {

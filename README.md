@@ -59,9 +59,13 @@ Two grammars share the palette. The Rov's console is dense and desktop-first: be
 a phone column with a bottom tab bar, from `md` up the tabs become a dark side rail carrying
 live counts, and from `lg` the pages split into columns — Today puts what needs a decision
 beside the day's diary, the queue becomes a table, and answering opens in a drawer over it so
-he never loses his place. The kehillah's screens are a phone app at every size: roomy, tappable,
-and centred on the page ground rather than stretched, because widening four actions would only
-make them harder to use.
+he never loses his place.
+
+The kehillah's screens are roomy and tappable, and change shape rather than stretching. On a
+phone each one fills the device. From `md` up — a tablet, or the laptop most people will
+actually open the website on — `<Screen>` turns it into a card on the page ground, sized to its
+content: sign-in puts the hero beside the form instead of a thousand pixels above it, home puts
+what you can ask beside where things stand, and the invitation form takes two columns.
 
 Anything pinned to the window (drawers, toasts) renders through `<Portal>`. Chromium keeps a
 containing block on an element that has animated its transform, so a `fixed` child inside a

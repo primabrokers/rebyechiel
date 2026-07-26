@@ -4,7 +4,7 @@ import { isConfigured, missingEnvVars } from './lib/supabase';
 import { isDemo } from './lib/demo';
 import { PreviewBanner } from './components/shared/PreviewBanner';
 import { PreviewPage } from './components/PreviewPage';
-import { Phone, Spinner } from './components/shared/ui';
+import { Screen, Spinner } from './components/shared/ui';
 import { LoginPage } from './components/auth/LoginPage';
 import { SignUpPage } from './components/auth/SignUpPage';
 import { HomePage } from './components/community/HomePage';
@@ -45,8 +45,8 @@ function PublicOnly({ children }: { children: JSX.Element }) {
 // blank white page with only a console error to go on.
 function SetupNeeded() {
   return (
-    <Phone tone="surface">
-      <div className="flex-1 px-6 pt-14 flex flex-col gap-5">
+    <Screen tone="surface">
+      <div className="flex-1 px-6 md:px-7 pt-14 md:pt-12 flex flex-col gap-5">
         <div className="w-[54px] h-[54px] rounded-xl bg-graphite grid place-items-center text-[24px] font-extrabold text-white">ר</div>
         <span className="text-[27px] font-extrabold leading-tight tracking-tight">Nearly there</span>
         <p className="text-[14.5px] leading-relaxed text-ink-soft">
@@ -64,7 +64,7 @@ function SetupNeeded() {
           when the site is built, so an existing deployment won't pick them up.
         </p>
       </div>
-    </Phone>
+    </Screen>
   );
 }
 

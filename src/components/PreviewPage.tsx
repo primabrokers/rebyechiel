@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Phone } from './shared/ui';
+import { Screen } from './shared/ui';
 
 /**
  * The way in to preview mode: pick which side to look at. Both run on invented data and cannot
@@ -7,7 +7,7 @@ import { Phone } from './shared/ui';
  */
 export function PreviewPage() {
   return (
-    <Phone tone="graphite">
+    <Screen tone="graphite">
       <div className="flex-1 px-6 pt-12 flex flex-col gap-6">
         <div className="w-[54px] h-[54px] rounded-xl bg-indigo grid place-items-center text-[24px] font-extrabold text-white">ר</div>
         <div className="flex flex-col gap-2.5">
@@ -39,6 +39,6 @@ export function PreviewPage() {
 
         <Link to="/login" className="text-[13px] font-bold text-indigo text-center pt-2">Sign in properly instead</Link>
       </div>
-    </Phone>
+    </Screen>
   );
 }

@@ -6,7 +6,7 @@ import { demoBookings, demoInvitations, demoMyShailos, isDemo } from '../../lib/
 import { useAuth } from '../../lib/auth';
 import { OCCASION_LABELS, type Booking, type Invitation, type Shailah } from '../../types';
 import { Eyebrow } from '../shared/ui';
-import { Phone } from '../shared/ui';
+import { Screen } from '../shared/ui';
 import { fmtSlot } from '../../lib/format';
 
 /**
@@ -80,14 +80,16 @@ export function HomePage() {
   const anything = open.length + answered.length + bookings.length + invitations.length > 0;
 
   return (
-    <Phone>
-      <div className="flex-none bg-graphite rounded-b-[26px] px-5 pt-5 pb-6 flex items-start gap-3">
+    <Screen width="lg">
+      <div className="flex-none bg-graphite rounded-b-[26px] md:rounded-b-none px-5 pt-5 pb-6 md:px-6 md:py-7 flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-indigo-light">
             {format(new Date(), 'EEEE d MMMM')}
           </div>
           <div className="mt-1.5 text-[25px] font-extrabold leading-[1.2] text-white">
-            {greeting()},<br />{profile?.full_name?.split(' ')[0] ?? 'and welcome'}
+            {/* Two lines on a phone, one on a screen with room for it. */}
+            {greeting()},<br className="md:hidden" />{' '}
+            {profile?.full_name?.split(' ')[0] ?? 'and welcome'}
           </div>
         </div>
         <button onClick={signOut} className="text-[11.5px] font-bold text-white/40 hover:text-white/70 flex-none pt-1">
@@ -95,16 +97,18 @@ export function HomePage() {
         </button>
       </div>
 
-      <div className="p-3.5 flex flex-col gap-2.5">
-        <ActionCard to="/ask" tone="indigo" icon="✦" title="Ask a shailah" sub="Only the Rov reads it" />
-        {/* U+FE0E keeps ☎ as a glyph rather than a colour emoji, which would break the palette. */}
-        <ActionCard to="/book/call" tone="plain" icon="☎︎" title="Book a phone call" sub="He rings you, at a time he has opened" />
-        <ActionCard to="/book/meeting" tone="plain" icon="◍" title="Ask to meet" sub="Face to face · he confirms himself" />
-        <ActionCard to="/invite" tone="dark" icon="✧" title="Invite the Rov to speak" sub="Simcha, shiur, organisation event" />
+      <div className="p-3.5 md:p-6 flex flex-col gap-2.5 md:grid md:grid-cols-2 md:gap-x-5 md:items-start">
+        <div className="flex flex-col gap-2.5">
+          <ActionCard to="/ask" tone="indigo" icon="✦" title="Ask a shailah" sub="Only the Rov reads it" />
+          {/* U+FE0E keeps ☎ as a glyph rather than a colour emoji, which would break the palette. */}
+          <ActionCard to="/book/call" tone="plain" icon="☎︎" title="Book a phone call" sub="He rings you, at a time he has opened" />
+          <ActionCard to="/book/meeting" tone="plain" icon="◍" title="Ask to meet" sub="Face to face · he confirms himself" />
+          <ActionCard to="/invite" tone="dark" icon="✧" title="Invite the Rov to speak" sub="Simcha, shiur, organisation event" />
+        </div>
 
         {anything && (
-          <>
-            <div className="flex items-baseline justify-between px-1 pt-2">
+          <div className="contents md:flex md:flex-col md:gap-2.5">
+            <div className="flex items-baseline justify-between px-1 pt-2 md:pt-0">
               <Eyebrow>Where things stand</Eyebrow>
               <Link to="/requests" className="text-[12px] font-bold text-indigo">All</Link>
             </div>
@@ -178,9 +182,9 @@ export function HomePage() {
                 </span>
               </Link>
             ))}
-          </>
+          </div>
         )}
       </div>
-    </Phone>
+    </Screen>
   );
 }

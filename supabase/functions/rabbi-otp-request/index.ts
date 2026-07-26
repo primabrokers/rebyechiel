@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
       expires_at: new Date(Date.now() + TTL_SECONDS * 1000).toISOString(),
     });
 
-    const sms = await sendSms(dest, `Your code for Rabbi Emanuel's Assistant is ${code}. It expires in ${Math.round(TTL_SECONDS / 60)} minutes.`);
+    const sms = await sendSms(dest, `Your code for Rabbi Yechiel Emanuel is ${code}. It expires in ${Math.round(TTL_SECONDS / 60)} minutes.`);
     return json({ ok: true, sent: sms.ok, configured: sms.configured, registered: Boolean(profile), error: sms.error ?? null });
   } catch (err) {
     return json({ error: err instanceof Error ? err.message : "unknown" }, 500);

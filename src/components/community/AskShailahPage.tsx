@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { isDemo } from '../../lib/demo';
 import type { Category, UrgencyTier } from '../../types';
 import {
-  BigButton, Choice, Headline, Note, Phone, PromisePanel, Spinner, StepBar, textareaCls,
+  BigButton, Choice, Headline, Note, PromisePanel, Screen, Spinner, StepBar, textareaCls,
 } from '../shared/ui';
 
 /**
@@ -108,8 +108,8 @@ export function AskShailahPage() {
   // --- sent ---------------------------------------------------------------------------------
   if (done) {
     return (
-      <Phone tone="surface">
-        <div className="flex-1 px-6 pt-16 flex flex-col gap-5">
+      <Screen tone="surface">
+        <div className="flex-1 px-6 md:px-7 pt-16 md:pt-12 flex flex-col gap-5">
           <div className="w-[62px] h-[62px] rounded-xl bg-indigo grid place-items-center text-[26px] text-white">✦</div>
           <Headline title={<>Your shailah is<br />with the Rov</>}
             sub="Only he reads it. We'll text you the moment there's an answer." />
@@ -122,18 +122,18 @@ export function AskShailahPage() {
             </>}
           />
         </div>
-        <div className="px-5 pb-7 flex flex-col gap-2.5">
+        <div className="px-5 md:px-7 pb-7 md:pb-8 flex flex-col gap-2.5">
           <BigButton onClick={() => nav('/')}>Back to home</BigButton>
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   if (!config) {
     return (
-      <Phone tone="surface">
+      <Screen tone="surface">
         {error ? <p className="pt-24 px-8 text-center text-[13.5px] font-bold text-late">{error}</p> : <Spinner />}
-      </Phone>
+      </Screen>
     );
   }
 
@@ -143,11 +143,11 @@ export function AskShailahPage() {
   };
 
   return (
-    <Phone tone="surface">
+    <Screen tone="surface">
       <StepBar onBack={back} steps={3} at={step} />
 
       {step === 0 && (
-        <div className="px-5 py-5 flex flex-col gap-3.5">
+        <div className="px-5 md:px-7 py-5 flex flex-col gap-3.5">
           <Headline title="What is it about?" sub="This only helps the Rov sort his queue — pick the closest." />
           <div className="flex flex-col gap-2">
             {config.categories.map((c) => (
@@ -160,7 +160,7 @@ export function AskShailahPage() {
       )}
 
       {step === 1 && (
-        <div className="px-5 py-5 flex flex-col gap-3.5">
+        <div className="px-5 md:px-7 py-5 flex flex-col gap-3.5">
           <Headline title="How urgent is this?" sub="Be honest — urgent questions really do jump the queue." />
           <div className="flex flex-col gap-2">
             {config.urgencyTiers.map((t) => (
@@ -174,7 +174,7 @@ export function AskShailahPage() {
 
       {step === 2 && (
         <>
-          <div className="px-5 py-5 flex flex-col gap-3.5">
+          <div className="px-5 md:px-7 py-5 flex flex-col gap-3.5">
             <Headline title="Write your shailah"
               sub={category?.is_sensitive
                 ? 'Write freely. This goes to the Rov alone — no helper of his can see it, in the app or anywhere else.'
@@ -219,13 +219,13 @@ export function AskShailahPage() {
             )}
           </div>
 
-          <div className="mt-auto px-5 pt-4 pb-7 flex flex-col gap-2.5">
+          <div className="mt-auto px-5 md:px-7 pt-4 pb-7 md:pb-8 flex flex-col gap-2.5">
             {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
             <BigButton busy={busy} disabled={question.trim().length < 10} onClick={submit}>Send to the Rov</BigButton>
             <span className="text-[11.5px] text-center text-ink-muted">Nobody else sees this. Not the office, not a helper.</span>
           </div>
         </>
       )}
-    </Phone>
+    </Screen>
   );
 }

@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
         if (settings.sms_notifications_enabled && caller.phone) {
           const when = fmtSlot(slot.startsAt, settings.timezone);
           const text = result.autoConfirmed
-            ? `Your ${slotType === "call" ? "phone call" : "meeting"} with Rabbi Emanuel is booked for ${when}. Ref ${result.booking.ref}.`
+            ? `Your ${slotType === "call" ? "phone call" : "meeting"} with Rabbi Yechiel Emanuel is booked for ${when}. Ref ${result.booking.ref}.`
             : `Your meeting request for ${when} has been sent to the Rov. We'll text you as soon as he confirms. Ref ${result.booking.ref}.`;
           await sendRabbiMessage(admin, {
             phone: caller.phone, body: text, profileId: caller.id,

@@ -61,20 +61,37 @@ export function BigButton({
   );
 }
 
-// --- the kehillah's phone screens ----------------------------------------------------------
+// --- the kehillah's screens ------------------------------------------------------------------
 /**
- * Every community screen is a phone screen. On a tablet or a desktop it sits centred on the page
- * ground rather than stretching — the same app, not a different one.
+ * One screen of the community app. On a phone it fills the device, edge to edge. From `md` up —
+ * a tablet, or the laptop most people will actually open the website on — it becomes a card
+ * sitting on the page ground, sized to its content instead of stretching a phone column down a
+ * 1200px window. Same app, correct shape for the glass it's behind.
  */
-export function Phone({ tone = 'canvas', className, children }: {
-  tone?: 'canvas' | 'surface' | 'graphite'; className?: string; children: ReactNode;
+const SHELL_WIDTH = {
+  /** Forms and single decisions: narrow keeps a line of text readable. */
+  sm: 'md:max-w-[520px]',
+  /** Longer forms and lists, which can take two columns of fields. */
+  md: 'md:max-w-[760px]',
+  /** The home screen, which puts what you can ask beside where things stand. */
+  lg: 'md:max-w-[1060px]',
+} as const;
+
+export function Screen({ tone = 'canvas', width = 'sm', className, children }: {
+  tone?: 'canvas' | 'surface' | 'graphite';
+  width?: keyof typeof SHELL_WIDTH;
+  className?: string;
+  children: ReactNode;
 }) {
+  const bg = tone === 'graphite' ? 'bg-graphite' : tone === 'surface' ? 'bg-surface' : 'bg-canvas';
   return (
-    <div className={clsx('min-h-screen flex justify-center',
-      tone === 'graphite' ? 'bg-graphite' : tone === 'surface' ? 'bg-surface' : 'bg-page')}>
-      <div className={clsx('w-full max-w-[440px] min-h-screen flex flex-col',
-        tone === 'graphite' ? 'bg-graphite' : tone === 'surface' ? 'bg-surface' : 'bg-canvas',
-        className)}>
+    <div className={clsx('min-h-screen flex flex-col items-center md:justify-center md:bg-page md:px-6 md:py-10',
+      tone === 'graphite' ? 'bg-graphite' : 'bg-canvas')}>
+      <div className={clsx(
+        'w-full flex-1 flex flex-col',
+        'md:flex-none md:min-h-[580px] md:rounded-2xl md:overflow-hidden md:shadow-lift md:border md:border-hair',
+        bg, SHELL_WIDTH[width], className,
+      )}>
         {children}
       </div>
     </div>
@@ -86,9 +103,10 @@ export function StepBar({ onBack, steps, at, right }: {
   onBack?: () => void; steps?: number; at?: number; right?: ReactNode;
 }) {
   return (
-    <div className="flex-none px-5 pt-3.5 flex items-center gap-3">
+    <div className="flex-none px-5 md:px-7 pt-3.5 md:pt-5 flex items-center gap-3">
       {onBack && (
-        <button onClick={onBack} aria-label="Back" className="text-[19px] leading-none text-ink-muted -ml-1 px-1">‹</button>
+        <button onClick={onBack} aria-label="Back"
+          className="text-[19px] leading-none text-ink-muted -ml-1 px-1 hover:text-ink transition-colors">‹</button>
       )}
       {steps ? (
         <div className="flex-1 flex gap-1.5">

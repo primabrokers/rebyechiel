@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { otpRequest, otpVerify } from '../../lib/api';
-import { BigButton, Field, Note, Phone, StepBar, inputCls } from '../shared/ui';
+import { BigButton, Field, Note, Screen, StepBar, inputCls } from '../shared/ui';
 
 /**
  * Signing in is one thing: your number, then the code we text you. No password to remember and
@@ -97,9 +97,9 @@ export function LoginPage() {
   // --- the code screen ----------------------------------------------------------------------
   if (screen === 'code') {
     return (
-      <Phone tone="surface">
+      <Screen tone="surface">
         <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
-        <div className="px-5 py-6 flex flex-col gap-4">
+        <div className="px-5 md:px-7 py-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-[24px] font-extrabold leading-tight tracking-tight">Check your texts</span>
             <span className="text-[13.5px] leading-relaxed text-ink-muted">
@@ -116,21 +116,21 @@ export function LoginPage() {
               : <button className="font-bold text-indigo" onClick={sendCode}>Send it again</button>}
           </div>
         </div>
-        <div className="mt-auto px-5 pb-7">
+        <div className="mt-auto px-5 md:px-7 pb-7 md:pb-8">
           <Note icon="☎︎">
             No smartphone? Text the Rov's number instead and the assistant takes your shailah by text.
           </Note>
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   // --- email and password, for the Rov and his helpers ---------------------------------------
   if (screen === 'email') {
     return (
-      <Phone tone="surface">
+      <Screen tone="surface">
         <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
-        <div className="px-5 py-6 flex flex-col gap-4">
+        <div className="px-5 md:px-7 py-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <span className="text-[24px] font-extrabold leading-tight tracking-tight">Sign in with email</span>
             <span className="text-[13.5px] leading-relaxed text-ink-muted">This is how the Rov and his helpers get in.</span>
@@ -146,55 +146,66 @@ export function LoginPage() {
           <BigButton busy={busy} disabled={!email || !password} onClick={emailLogin}>Sign in</BigButton>
           {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   // --- the welcome screen -------------------------------------------------------------------
+  // On a phone this is the hero with the sign-in sheet pulled up over it. On a laptop the two
+  // stop stacking and sit side by side, so the form is at eye level instead of a thousand
+  // pixels down an empty dark page.
   return (
-    <Phone tone="graphite">
-      <div className="flex-1 px-6 pt-10 flex flex-col gap-6">
-        <div className="w-[54px] h-[54px] rounded-xl bg-indigo grid place-items-center text-[24px] font-extrabold text-white">ר</div>
-        <div className="flex flex-col gap-2.5">
-          <span className="text-[30px] font-extrabold leading-[1.18] text-white">Rabbi Emanuel's<br />Assistant</span>
-          <span className="text-[14.5px] leading-relaxed text-white/[.62]">
-            Ask a shailah, book a call, invite the Rov to speak. Straight to him — nobody else reads it.
-          </span>
-        </div>
-        <div className="flex flex-col gap-3">
-          {['No password to remember', "You're told when to expect an answer", 'Private questions stay private'].map((t) => (
-            <div key={t} className="flex items-center gap-3">
-              <span className="w-[5px] h-[5px] rounded-pill bg-indigo flex-none" />
-              <span className="text-[13.5px] text-white/[.72]">{t}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-surface rounded-t-[26px] px-5 pt-6 pb-7 flex flex-col gap-3.5">
-        <div className="flex flex-col gap-2">
-          <span className="text-[13.5px] font-bold text-ink-soft">Your mobile number</span>
-          <div className="flex items-center gap-2.5 border border-firm rounded-lg px-4 py-3.5 focus-within:border-indigo">
-            <span className="font-mono text-[15px] font-bold text-ink-muted">+44</span>
-            <span className="w-px h-[18px] bg-[rgba(16,19,24,.12)]" />
-            <input
-              className="flex-1 min-w-0 bg-transparent font-mono text-[15px] tracking-[0.04em] text-ink placeholder:text-ink-ghost focus:outline-none"
-              type="tel" inputMode="tel" autoComplete="tel" placeholder="7700 900123"
-              value={phone} onChange={(e) => setPhone(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && phone.replace(/\D/g, '').length >= 9) sendCode(); }}
-            />
+    <div className="min-h-screen flex flex-col bg-graphite md:bg-page md:items-center md:justify-center md:px-6 md:py-10">
+      <div className="w-full flex-1 flex flex-col md:flex-none md:max-w-[940px] md:min-h-[560px]
+        md:grid md:grid-cols-2 md:rounded-2xl md:overflow-hidden md:shadow-lift">
+        <div className="flex-1 bg-graphite px-6 pt-10 pb-8 md:px-9 md:py-10 flex flex-col justify-center gap-6">
+          <div className="w-[54px] h-[54px] rounded-xl bg-indigo grid place-items-center text-[24px] font-extrabold text-white">ר</div>
+          <div className="flex flex-col gap-2.5">
+            <span className="text-[30px] font-extrabold leading-[1.18] text-white text-balance">
+              Contact Rabbi<br />Yechiel Emanuel
+            </span>
+            <span className="text-[14.5px] leading-relaxed text-white/[.62]">
+              Ask a shailah, book a call, invite the Rov to speak. Straight to him — nobody else reads it.
+            </span>
           </div>
-          <span className="text-[12.5px] leading-snug text-ink-muted">We text you a six-digit code. That's the whole sign-in.</span>
+          <div className="flex flex-col gap-3">
+            {['No password to remember', "You're told when to expect an answer", 'Private questions stay private'].map((t) => (
+              <div key={t} className="flex items-center gap-3">
+                <span className="w-[5px] h-[5px] rounded-pill bg-indigo flex-none" />
+                <span className="text-[13.5px] text-white/[.72]">{t}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <BigButton busy={busy} disabled={phone.replace(/\D/g, '').length < 9} onClick={sendCode}>Text me a code</BigButton>
-        {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
-        <div className="text-center text-[13px] text-ink-muted">
-          First time here? <Link to="/signup" className="font-extrabold text-indigo">Create an account</Link>
+
+        <div className="bg-surface rounded-t-[26px] md:rounded-none px-5 pt-6 pb-7 md:px-9 md:py-10
+          flex flex-col justify-center gap-3.5">
+          <span className="hidden md:block text-[20px] font-extrabold tracking-tight">Sign in</span>
+          <div className="flex flex-col gap-2">
+            <span className="text-[13.5px] font-bold text-ink-soft">Your mobile number</span>
+            <div className="flex items-center gap-2.5 border border-firm rounded-lg px-4 py-3.5 focus-within:border-indigo">
+              <span className="font-mono text-[15px] font-bold text-ink-muted">+44</span>
+              <span className="w-px h-[18px] bg-[rgba(16,19,24,.12)]" />
+              <input
+                className="flex-1 min-w-0 bg-transparent font-mono text-[15px] tracking-[0.04em] text-ink placeholder:text-ink-ghost focus:outline-none"
+                type="tel" inputMode="tel" autoComplete="tel" placeholder="7700 900123"
+                value={phone} onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && phone.replace(/\D/g, '').length >= 9) sendCode(); }}
+              />
+            </div>
+            <span className="text-[12.5px] leading-snug text-ink-muted">We text you a six-digit code. That's the whole sign-in.</span>
+          </div>
+          <BigButton busy={busy} disabled={phone.replace(/\D/g, '').length < 9} onClick={sendCode}>Text me a code</BigButton>
+          {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+          <div className="text-center text-[13px] text-ink-muted">
+            First time here? <Link to="/signup" className="font-extrabold text-indigo">Create an account</Link>
+          </div>
+          <button className="text-[12.5px] font-bold text-ink-muted hover:text-ink transition-colors"
+            onClick={() => { setScreen('email'); setError(null); }}>
+            Sign in with email instead
+          </button>
         </div>
-        <button className="text-[12.5px] font-bold text-ink-muted" onClick={() => { setScreen('email'); setError(null); }}>
-          Sign in with email instead
-        </button>
       </div>
-    </Phone>
+    </div>
   );
 }

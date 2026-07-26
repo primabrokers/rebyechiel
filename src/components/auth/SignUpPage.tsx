@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { api, otpRequest, otpVerify } from '../../lib/api';
 import type { Affiliation } from '../../types';
-import { BigButton, Choice, Field, Headline, Phone, StepBar, inputCls } from '../shared/ui';
+import { BigButton, Choice, Field, Headline, Screen, StepBar, inputCls } from '../shared/ui';
 import { useAuth } from '../../lib/auth';
 
 /**
@@ -99,9 +99,9 @@ export function SignUpPage() {
   // --- step 1: who are you? -----------------------------------------------------------------
   if (step === 0) {
     return (
-      <Phone tone="surface">
+      <Screen tone="surface">
         <StepBar onBack={() => nav('/login')} steps={2} at={0} />
-        <div className="px-5 py-4 flex flex-col gap-3.5">
+        <div className="px-5 md:px-7 py-4 flex flex-col gap-3.5">
           <Headline title="Who are you?" sub="The Rov sees this on every question, so he knows who he's answering." />
 
           <Field label="Your full name">
@@ -128,21 +128,21 @@ export function SignUpPage() {
           </div>
         </div>
 
-        <div className="mt-auto px-5 pt-3 pb-6 flex flex-col gap-2">
+        <div className="mt-auto px-5 md:px-7 pt-3 pb-6 md:pb-8 flex flex-col gap-2">
           <BigButton disabled={!detailsOk} onClick={() => setStep(1)}>Carry on</BigButton>
           <div className="text-center text-[12px] text-ink-muted">
             Already have one? <Link to="/login" className="font-extrabold text-indigo">Sign in</Link>
           </div>
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   // --- step 2: how we reach you --------------------------------------------------------------
   return (
-    <Phone tone="surface">
+    <Screen tone="surface">
       <StepBar onBack={() => setStep(0)} steps={2} at={1} />
-      <div className="px-5 py-4 flex flex-col gap-4">
+      <div className="px-5 md:px-7 py-4 flex flex-col gap-4">
         <Headline
           title={method === 'phone' ? 'Your mobile number' : 'Email and password'}
           sub={method === 'phone'
@@ -203,12 +203,12 @@ export function SignUpPage() {
         {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
       </div>
 
-      <div className="mt-auto px-5 pb-7 flex flex-col gap-2.5 text-center">
+      <div className="mt-auto px-5 md:px-7 pb-7 md:pb-8 flex flex-col gap-2.5 text-center">
         <button className="text-[12.5px] font-bold text-ink-muted"
           onClick={() => { setMethod(method === 'phone' ? 'email' : 'phone'); setCodeSent(false); setError(null); }}>
           {method === 'phone' ? 'Use email and a password instead' : 'Use my mobile number instead'}
         </button>
       </div>
-    </Phone>
+    </Screen>
   );
 }

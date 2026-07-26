@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { api } from '../../lib/api';
 import { OCCASION_LABELS, type Occasion } from '../../types';
 import {
-  BigButton, Headline, Note, Phone, PillPick, PromisePanel, StepBar, inputCls, textareaCls,
+  BigButton, Headline, Note, PillPick, PromisePanel, Screen, StepBar, inputCls, textareaCls,
 } from '../shared/ui';
 
 /**
@@ -59,8 +59,8 @@ export function InvitePage() {
 
   if (done) {
     return (
-      <Phone tone="surface">
-        <div className="flex-1 px-6 pt-16 flex flex-col gap-5">
+      <Screen tone="surface" width="md">
+        <div className="flex-1 px-6 md:px-7 pt-16 md:pt-12 flex flex-col gap-5">
           <div className="w-[62px] h-[62px] rounded-xl bg-graphite grid place-items-center text-[26px] text-white">✧</div>
           <Headline title={<>Your invitation is<br />with the Rov</>}
             sub="He answers these himself. You'll hear back, whichever way he decides." />
@@ -70,18 +70,18 @@ export function InvitePage() {
             sub={<>{duration} minutes at {location}. Your reference is <b className="font-mono">{done.ref}</b>.</>}
           />
         </div>
-        <div className="px-5 pb-7">
+        <div className="px-5 md:px-7 pb-7 md:pb-8">
           <BigButton onClick={() => nav('/')}>Back to home</BigButton>
         </div>
-      </Phone>
+      </Screen>
     );
   }
 
   return (
-    <Phone tone="surface">
+    <Screen tone="surface" width="md">
       <StepBar onBack={() => nav('/')} steps={2} at={1} />
 
-      <div className="px-5 py-4 flex flex-col gap-3.5">
+      <div className="px-5 md:px-7 py-4 flex flex-col gap-3.5">
         <Headline title="Invite the Rov to speak" sub="He answers these himself — you'll hear back, whichever way." />
 
         <div className="flex flex-col gap-2">
@@ -89,6 +89,8 @@ export function InvitePage() {
           <PillPick value={occasion} options={OCCASIONS} onPick={setOccasion} />
         </div>
 
+        <div className="md:grid md:grid-cols-2 md:gap-x-5 flex flex-col gap-3.5">
+        <div className="flex flex-col gap-3.5">
         <div className="flex gap-2.5">
           <label className="flex-1 flex flex-col gap-1.5">
             <span className="text-[12.5px] font-bold text-ink-soft">Date</span>
@@ -119,6 +121,9 @@ export function InvitePage() {
           </div>
         </div>
 
+        </div>
+
+        <div className="flex flex-col gap-3.5">
         <label className="flex flex-col gap-1.5">
           <span className="text-[12.5px] font-bold text-ink-soft">Where is it?</span>
           <input className={inputCls} placeholder="e.g. Simcha hall, 14 Cheltenham Cres"
@@ -138,17 +143,20 @@ export function InvitePage() {
             value={attendance} onChange={(e) => setAttendance(e.target.value.replace(/\D/g, ''))} />
         </label>
 
+        </div>
+        </div>
+
         <Note>
           Nothing is held for you yet. If it clashes with his shiur or a chosson lesson, he sees that the
           moment he opens it — and he'll tell you either way.
         </Note>
       </div>
 
-      <div className="mt-auto px-5 pt-3 pb-7 flex flex-col gap-2">
+      <div className="mt-auto px-5 md:px-7 pt-3 pb-7 md:pb-8 flex flex-col gap-2">
         {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
         <BigButton busy={busy} disabled={!ready} onClick={submit}>Send the invitation</BigButton>
         <span className="text-[11.5px] text-center text-ink-muted">Nothing goes in his diary until he says yes.</span>
       </div>
-    </Phone>
+    </Screen>
   );
 }

@@ -20,7 +20,7 @@ import { localParts } from "../_shared/rabbiEta.ts";
  */
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-const APP_NAME = "Rabbi Emanuel's Assistant";
+const APP_NAME = "Rabbi Yechiel Emanuel";
 
 function fmtSlot(iso: string, tz: string): string {
   return new Intl.DateTimeFormat("en-GB", {

@@ -1,7 +1,7 @@
 {
-  "name": "Rabbi Emanuel's Assistant",
-  "short_name": "Rabbi Emanuel",
-  "description": "Ask Rabbi Yechiel Emanuel a shailah, book a phone call or arrange a meeting.",
+  "name": "Contact Rabbi Yechiel Emanuel",
+  "short_name": "R. Y. Emanuel",
+  "description": "Ask Rabbi Yechiel Emanuel a shailah, book a phone call, ask to meet, or invite him to speak.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
