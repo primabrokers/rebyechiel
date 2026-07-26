@@ -23,7 +23,10 @@ export async function sendSms(phone: string, text: string): Promise<SmsResult> {
   if (!username || !apiKey) return { ok: false, configured: false };
   const sender = await getSecret("TEXTMAGIC_SENDER");
   const params = new URLSearchParams({ text, phones: phone });
-  if (sender) params.set("from", sender); // else TextMagic uses the account default sender
+  // TextMagic wants `from` as a bare number ("447418342580"), not E.164 — with the plus it is
+  // read as an alphanumeric sender ID and rejected as "not registered under your account", even
+  // when the number genuinely is yours. Alphanumeric sender IDs pass through untouched.
+  if (sender) params.set("from", /^\+\d+$/.test(sender.trim()) ? sender.trim().slice(1) : sender.trim());
   const res = await fetch("https://rest.textmagic.com/api/v2/messages", {
     method: "POST",
     headers: {
