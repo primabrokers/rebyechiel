@@ -62,8 +62,9 @@ export function TodayPage() {
   };
 
   return (
-    <div className="flex flex-col gap-3.5 px-4">
-      <div className="masthead text-white -mx-4 px-7 pt-10 pb-16">
+    <div className="flex flex-col gap-3.5">
+      {/* Full-bleed masthead; everything below sits in a readable column. */}
+      <div className="masthead text-white px-7 md:px-10 pt-10 md:pt-12 pb-16">
         <div className="text-[12px] tracking-[0.14em] uppercase font-bold text-brass-300/95">
           {format(now, 'EEEE · d MMMM')}
         </div>
@@ -86,6 +87,7 @@ export function TodayPage() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3.5 px-4 md:px-8 lg:px-10 md:max-w-6xl">
       {briefing && (
         <div className="glass-card rounded-2xl shadow-raised p-4.5 p-5 -mt-14 relative z-10">
           <div className="text-[11px] tracking-[0.13em] uppercase font-extrabold text-brass-500 mb-1.5">Your morning briefing</div>
@@ -93,6 +95,10 @@ export function TodayPage() {
         </div>
       )}
 
+      {/* From lg up the day splits in two: things needing a decision on the left, the diary on
+          the right, so a tablet or desktop shows the whole picture without scrolling. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-8 lg:items-start">
+      <div className="flex flex-col gap-3.5">
       {dueToday.length > 0 && (
         <>
           <SectionLabel action={<Link to="/rabbi/questions" className="text-[12.5px] font-bold text-royal-600">All {queue.length} →</Link>}>
@@ -108,7 +114,7 @@ export function TodayPage() {
               </div>
               {!s.is_sensitive && s.ai_summary && <p className="text-[14px] text-ink-soft">{s.ai_summary}</p>}
               {s.is_sensitive && <p className="text-[14px] text-ink-soft">Details shown only when you open it</p>}
-              <BigButton onClick={() => nav(`/rabbi/answer/${s.id}`)}>Answer</BigButton>
+              <BigButton className="sm:max-w-[220px]" onClick={() => nav(`/rabbi/answer/${s.id}`)}>Answer</BigButton>
             </div>
           ))}
         </>
@@ -126,7 +132,7 @@ export function TodayPage() {
               <p className="text-[14px] text-ink-soft">
                 {fmtSlot(b.starts_at)}{b.purpose ? ` · "${b.purpose}"` : ''}
               </p>
-              <div className="flex gap-2.5">
+              <div className="flex gap-2.5 sm:max-w-[420px]">
                 <BigButton tone="success" busy={busyId === b.id} className="flex-1 min-h-[50px] py-3 text-[15px]"
                   onClick={() => actMeeting(b.id, 'confirmed')}>Approve</BigButton>
                 <BigButton tone="ghost" busy={busyId === b.id} className="flex-1 min-h-[50px] py-3 text-[15px]"
@@ -148,6 +154,9 @@ export function TodayPage() {
         </>
       )}
 
+      </div>
+
+      <div className="flex flex-col gap-3.5 mt-3.5 lg:mt-0">
       <SectionLabel>Today's diary</SectionLabel>
       <div className="bg-surface rounded-xl shadow-card px-4 py-2">
         {todayBlocks.length === 0 && todaysBookings.length === 0 && (
@@ -170,6 +179,9 @@ export function TodayPage() {
             </div>
           </div>
         ))}
+      </div>
+      </div>
+      </div>
       </div>
     </div>
   );

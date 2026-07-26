@@ -54,7 +54,7 @@ export function DiaryPage() {
   };
 
   return (
-    <div className="flex flex-col gap-3 px-4 pt-8">
+    <div className="flex flex-col gap-3 px-4 md:px-8 lg:px-10 pt-8 md:max-w-5xl">
       <div className="px-1.5">
         <Display className="text-[26px]">Diary</Display>
         <p className="text-[13.5px] text-ink-muted mt-1">Appointments, released times, and your fixed week.</p>

@@ -118,7 +118,7 @@ export function AnswerShailahPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-8">
+    <div className="flex flex-col gap-4 px-4 md:px-8 lg:px-10 pt-8 md:max-w-4xl">
       <div className="flex items-center gap-2 px-1">
         <Link to="/rabbi/questions" className="p-2 -ml-2 text-ink-soft"><ArrowLeft size={24} /></Link>
         <div className="flex-1">

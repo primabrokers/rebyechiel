@@ -57,7 +57,7 @@ export function QueuePage() {
   const list = tab === 'open' ? queue : answered;
 
   return (
-    <div className="flex flex-col gap-3 px-4 pt-8">
+    <div className="flex flex-col gap-3 px-4 md:px-8 lg:px-10 pt-8 md:max-w-6xl">
       <div className="px-1.5">
         <Display className="text-[26px]">Questions</Display>
         <p className="text-[13.5px] text-ink-muted mt-1">Sorted for you — urgent first.</p>
@@ -78,6 +78,8 @@ export function QueuePage() {
         <EmptyState title={tab === 'open' ? 'Nothing waiting — enjoy the quiet' : 'No answered questions yet'} />
       )}
 
+      {/* Cards sit two-up from lg so a tablet or desktop scans the queue in half the scrolling. */}
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
       {list.map((s) => {
         const due = fmtDue(s.due_at);
         const needsTriageConfirm = tab === 'open' && !s.triage_confirmed_at &&
@@ -109,7 +111,7 @@ export function QueuePage() {
                 <Check size={17} strokeWidth={3} />
                 Suggested: {catName(s.ai_suggested_category_id ?? s.category_id) ?? 'as asked'}
                 {(s.ai_suggested_urgency_id || s.urgency_tier_id) && ` · ${tierName(s.ai_suggested_urgency_id ?? s.urgency_tier_id)?.split(' — ')[0]}`}
-                — tap to confirm
+                {' — tap to confirm'}
               </button>
             )}
             {tab === 'open'
@@ -118,6 +120,7 @@ export function QueuePage() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

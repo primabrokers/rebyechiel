@@ -44,10 +44,10 @@ export function exitDemo() {
 // --- helpers so the sample data always looks like today -----------------------------------
 const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
 const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
-/** Today at a given local hour, for due dates that should read as "due today". */
-function todayAt(hour: number): string {
+/** Today at a given local time, for due dates that should read as "due today". */
+function todayAt(hour: number, minute = 0): string {
   const d = new Date();
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 }
 /** The next occurrence of a weekday at a given hour — keeps sample bookings in the future. */
@@ -171,7 +171,7 @@ export const demoMyShailos: Shailah[] = [
 export const demoBookings: Booking[] = [
   {
     id: 'demo-b-1', ref: 'B-0027', profile_id: PROFILE.dovid, contact_name: null, contact_phone: null,
-    slot_type: 'call', starts_at: hoursFromNow(5), ends_at: hoursFromNow(5.17),
+    slot_type: 'call', starts_at: todayAt(21), ends_at: todayAt(21, 10),
     purpose: null, status: 'confirmed', decline_reason: null, created_at: daysAgo(1),
   },
   {

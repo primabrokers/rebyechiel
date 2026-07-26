@@ -48,6 +48,16 @@ value is treated as "not configured" and the feature simply stays off.
 Stored in the database vault (already set): `project_url`, `cron_internal_secret`,
 `RABBI_SMS_WEBHOOK_SECRET`.
 
+## Layouts
+
+The Rov works from a phone, an Android tablet and a desktop, so his side changes shape rather
+than stretching. Below `md` it is a phone column with the floating tab bar; from `md` up the
+tabs become a fixed side rail, and from `lg` the pages split into columns — Today puts what
+needs a decision beside the day's diary, the queue goes two-up, and Diary and Settings pair
+their sections. Content is capped (`max-w-6xl`/`5xl`/`4xl` by page) so nothing sprawls on a wide
+monitor. The community side stays a single centred column at every size: it is three actions,
+and widening it would only make it harder to use.
+
 ## Preview mode
 
 `/preview` lets anyone click through both sides with invented sample data and no login —

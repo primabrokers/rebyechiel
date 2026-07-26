@@ -39,7 +39,7 @@ export function MorePage() {
   };
 
   return (
-    <div className="flex flex-col gap-3 px-4 pt-8">
+    <div className="flex flex-col gap-3 px-4 md:px-8 lg:px-10 pt-8 md:max-w-5xl">
       <div className="px-1.5 flex items-start justify-between">
         <div>
           <Display className="text-[26px]">Settings</Display>
