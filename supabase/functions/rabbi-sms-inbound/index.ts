@@ -24,7 +24,7 @@ import {
  */
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-const STATES = ["idle", "intent", "collecting_shailah", "collecting_booking", "confirming", "done", "handed_off"] as const;
+const STATES = ["idle", "intent", "collecting_shailah", "collecting_booking", "confirming", "sent", "amending", "done", "handed_off"] as const;
 type ConvState = typeof STATES[number];
 const CONVERSATION_TTL_MS = 4 * 60 * 60 * 1000;
 const MAX_SLOTS_OFFERED = 3;
@@ -46,6 +46,12 @@ interface Draft {
   clarified?: boolean;
   /** They have been told Shabbos is nearly in. Saying it twice is nagging. */
   rest_notice_sent?: boolean;
+  /** The shailah this conversation already sent, so CHANGE knows what to change. */
+  shailah_id?: string;
+  shailah_ref?: string;
+  submitted_at?: string;
+  /** They have been chased once for going quiet. Nobody is chased twice. */
+  chased_at?: string;
   confused_turns?: number;
   offered_slots?: SlotOut[];
 }
@@ -140,6 +146,12 @@ const THANKS_RE =
 /** Chasing an answer. They deserve a straight fact, not another round of questions. */
 const STATUS_RE =
   /\b(any news|any update|heard back|did (he|the rov) (answer|reply|get|see)|is there an answer|has (he|the rov) (answered|replied)|what'?s happening (with|about)|where (are we|is it) up to|still waiting)\b/i;
+
+/** How long a sent shailah stays reworadable. Long enough to spot what you left out. */
+const AMEND_WINDOW_MS = 30 * 60_000;
+
+/** Asking to reword something already sent. */
+const CHANGE_RE = /\b(change|amend|reword|edit|correct|that'?s not right|i meant|add to (it|that)|forgot to say)\b/i;
 
 /** A way out of a conversation that has gone wrong, without waiting for it to time out. */
 const RESET_RE =
@@ -421,6 +433,76 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    /**
+     * Save the shailah. Called the moment there is enough to send, not after a YES.
+     *
+     * A question that dies waiting for a confirmation nobody sends costs somebody their answer;
+     * a question the Rov glances at and does not need costs him ten seconds. So it goes, and they
+     * are told they can still change it. Bookings are not done this way and must not be — a
+     * booking takes a time out of somebody else's hands.
+     */
+    const submitShailah = async (d: Draft) => {
+      const [{ data: cat }, { data: tier }] = await Promise.all([
+        d.category_slug
+          ? admin.from("rabbi_categories").select("id").eq("slug", d.category_slug).maybeSingle()
+          : Promise.resolve({ data: null }),
+        d.urgency_slug
+          ? admin.from("rabbi_urgency_tiers").select("id").eq("slug", d.urgency_slug).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      // profileId, not profile.id: somebody who gave their name earlier in THIS conversation
+      // became a contact a few turns ago, and the row loaded at the top of the request predates
+      // them. Using the stale one left the shailah attached to nobody, which is how S-0001
+      // reached the Rov as a phone number rather than as Anthony Geller.
+      if (!profileId && (d.name ?? null)) profileId = await rememberContact(from, d.name!);
+      return await createShailah(admin, settings, {
+        profileId,
+        contactName: profile?.full_name ?? d.name ?? null,
+        contactPhone: from,
+        channel: "sms",
+        categoryId: cat?.id ?? null,
+        urgencyTierId: tier?.id ?? null,
+        question: d.question!,
+      });
+    };
+
+    /**
+     * Changing a shailah already sent. Open for half an hour, because that is about how long it
+     * takes to realise you left out the bit that mattered — after which it is the Rov's, he may
+     * well have answered it, and quietly rewriting a question under him would be worse than
+     * making somebody send a second one.
+     */
+    if (state === "sent" && draft.shailah_id) {
+      const sentMs = draft.submitted_at ? Date.parse(draft.submitted_at) : 0;
+      const withinWindow = sentMs > 0 && Date.now() - sentMs < AMEND_WINDOW_MS;
+      if (CHANGE_RE.test(text)) {
+        if (!withinWindow) {
+          return await reply(
+            `${draft.shailah_ref ?? "That question"} is already with the Rov, so I'll leave it as it is. `
+            + "Text the correction and I'll send it as a second note to go with it.",
+            { state: "collecting_shailah", draft: { ...draft, question: undefined, clarified: undefined } },
+          );
+        }
+        return await reply(
+          `Of course — send it again how you'd like it to read, and I'll replace what went to the Rov.`,
+          { state: "amending", draft },
+        );
+      }
+    }
+
+    // The replacement wording itself. Straight onto the same shailah, so the Rov reads one
+    // question rather than two halves of one.
+    if (state === "amending" && draft.shailah_id) {
+      const { error } = await admin.from("rabbi_shailos")
+        .update({ question: text.slice(0, 3000) }).eq("id", draft.shailah_id);
+      if (error) return await reply("Something went wrong changing it — the Rov still has the first version.", {});
+      fireTriage(draft.shailah_id);
+      return await reply(
+        `Changed. ${draft.shailah_ref ?? "Your question"} now reads as you just sent it.`,
+        { state: "sent", draft: { ...draft, question: text.slice(0, 3000) } },
+      );
+    }
+
     // Confirmation handling — deterministic; the commit never depends on the model.
     if (state === "confirming") {
       if (/^(yes|y|yes please|ok|confirm)\b/i.test(lower)) {
@@ -629,9 +711,16 @@ If you are unsure, it is the same subject — wrongly starting again loses what 
 
 STATE MACHINE (you may only move forward along it):
 idle/intent -> collecting_shailah (they want to ask a question) or collecting_booking (call/meeting)
-collecting_shailah -> confirming, once you have their question, your one follow-up answered, and their name if not a known member.
+collecting_shailah -> sent. A shailah is SENT as soon as you have their question, your one
+follow-up answered, and their name if not a known member. There is no confirmation step for a
+question and you must never ask for one: do not write "reply YES", do not offer to send it, do
+not ask if that is right. Code sends it and tells them so. A question left waiting on a YES that
+never comes is somebody who never gets an answer.
 collecting_booking -> confirming, once a numbered slot is chosen (and their name if needed).
-confirming: restate what will be sent/booked and tell them to reply YES.
+confirming: this is for BOOKINGS only. Restate the time and tell them to reply YES — a booking
+takes a time out of somebody else's hands, so that one is worth confirming.
+sent: their question is already with the Rov. Do not re-send it and do not ask about it again.
+If they text something new, treat it as a new subject.
 
 Reply with STRICT JSON only:
 {"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "complete": false, "confused": false, "new_topic": false}
@@ -696,6 +785,8 @@ Only include updates fields you learned THIS turn. slot_index must reference the
       idle: ["intent", "collecting_shailah", "collecting_booking"],
       intent: ["intent", "collecting_shailah", "collecting_booking"],
       collecting_shailah: ["collecting_shailah", "confirming"],
+      sent: ["sent", "collecting_shailah", "collecting_booking", "intent"],
+      amending: ["amending", "sent"],
       collecting_booking: ["collecting_booking", "confirming"],
       confirming: ["confirming", "collecting_shailah", "collecting_booking"],
     };
@@ -769,7 +860,10 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     const enoughDetail = noProbe || newDraft.clarified === true || parsed.complete === true;
     if (intent === "shailah" && newDraft.question && !enoughDetail) newDraft.clarified = true;
 
-    const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who) && enoughDetail;
+    // Not once it has already gone. Without this, the next text in a finished conversation
+    // re-satisfies every condition and the Rov gets the same shailah twice.
+    const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who)
+      && enoughDetail && !newDraft.shailah_id;
     const bookingReady = (intent === "call" || intent === "meeting")
       && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who)
       && Boolean(newDraft.purpose);
@@ -798,11 +892,22 @@ Only include updates fields you learned THIS turn. slot_index must reference the
 
     let finalState: ConvState = nextState;
     if (shailahReady) {
-      finalState = "confirming";
-      const urgent = newDraft.urgency_slug === "urgent";
-      const q = String(newDraft.question).replace(/\s+/g, " ").trim();
-      replyText = `Thank you ${who!.split(" ")[0]}. Sending to the Rov: "${q.length > 140 ? q.slice(0, 137) + "\u2026" : q}"`
-        + `${urgent ? " \u2014 marked urgent." : "."} Reply YES to send it, or NO to change it.`;
+      // Sent, not offered for confirmation. Nobody has to do anything more for the Rov to see it.
+      const result = await submitShailah(newDraft);
+      if (result.error || !result.shailah) {
+        finalState = "collecting_shailah";
+        replyText = "Something went wrong saving your question just then. Please send it again.";
+      } else {
+        finalState = "sent";
+        newDraft.shailah_id = result.shailah.id;
+        newDraft.shailah_ref = result.shailah.ref;
+        newDraft.submitted_at = new Date().toISOString();
+        fireTriage(result.shailah.id);
+        const urgent = newDraft.urgency_slug === "urgent";
+        replyText = `Thank you ${who!.split(" ")[0]} \u2014 that's with the Rov now (${result.shailah.ref})`
+          + `${urgent ? ", marked urgent" : ""}. ${result.shailah.expected_reply_text} `
+          + `Text CHANGE in the next half hour if you'd like to reword it.`;
+      }
     } else if (bookingReady) {
       finalState = "confirming";
       const slot = newDraft.offered_slots![newDraft.slot_index! - 1];

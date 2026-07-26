@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
   if (pre) return pre;
   // verify_jwt is off for cron delivery — enforce our own auth before doing anything.
   if (!(await isCronAuthorised(req))) return json({ error: "forbidden" }, 403);
-  const report: Record<string, number> = { reminders: 0, answers: 0, bookingStatus: 0, nudges: 0, timeouts: 0 };
+  const report: Record<string, number> = { reminders: 0, answers: 0, bookingStatus: 0, nudges: 0, chases: 0, timeouts: 0 };
   try {
     const { data: settings } = await admin.from("rabbi_settings").select("*").eq("id", 1).maybeSingle();
     const tz = settings?.timezone ?? "Europe/London";
@@ -156,6 +156,39 @@ Deno.serve(async (req: Request) => {
           report.nudges++;
         }
       }
+    }
+
+    /**
+     * 4b. One chase, half an hour after somebody went quiet part-way through a question.
+     *
+     * They were asked something — which medicine, was the pot used that day — and never answered,
+     * so their shailah does not exist and the Rov has no idea it was ever asked. Half an hour is
+     * long enough that they have plainly put the phone down, and short enough that they still
+     * remember what they were texting about. Once, never twice, and never for a booking, where
+     * going quiet usually means they thought better of it.
+     */
+    const chaseBefore = new Date(now.getTime() - 30 * 60_000).toISOString();
+    const { data: wentQuiet } = await admin.from("rabbi_conversations")
+      .select("id, phone, draft, state, last_inbound_at")
+      .in("state", ["collecting_shailah", "confirming"])
+      .lt("last_inbound_at", chaseBefore)
+      .gt("expires_at", now.toISOString())
+      .limit(20);
+    for (const c of wentQuiet ?? []) {
+      const d = (c.draft ?? {}) as Record<string, unknown>;
+      if (d.chased_at) continue;                       // already nudged once
+      if (!d.question) continue;                       // nothing half-finished to chase
+      if (!communitySendsAllowed) continue;
+      await sendRabbiMessage(admin, {
+        phone: c.phone, conversationId: c.id,
+        body: "Just checking \u2014 you started sending the Rov a question and it isn't with him yet. "
+          + "Reply with anything and I'll finish it off, or text REFRESH to start again.",
+        relatedType: "conversation", relatedId: c.id, kind: "chase",
+      });
+      await admin.from("rabbi_conversations")
+        .update({ draft: { ...d, chased_at: now.toISOString() }, updated_at: now.toISOString() })
+        .eq("id", c.id);
+      report.chases++;
     }
 
     // 5. Stale SMS conversations back to idle (the bot says goodbye once).
