@@ -9,7 +9,7 @@
 // sticks for the browser tab, so navigating around keeps you in preview.
 
 import type {
-  Booking, Category, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier,
+  Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier,
 } from '../types';
 
 export type DemoRole = 'rabbi' | 'member';
@@ -86,10 +86,10 @@ export const demoTiers: UrgencyTier[] = [
 ];
 
 export const demoProfiles: Record<string, Profile> = {
-  [PROFILE.rov]: { id: PROFILE.rov, role: 'rabbi', full_name: 'Rabbi Yechiel Emanuel', phone: '+447700900001', affiliation: null, is_active: true },
-  [PROFILE.dovid]: { id: PROFILE.dovid, role: 'community', full_name: 'Dovid Schwartz', phone: '+447700900123', affiliation: 'shul_member', is_active: true },
-  [PROFILE.rivky]: { id: PROFILE.rivky, role: 'community', full_name: 'Rivky Gold', phone: '+447700900456', affiliation: 'mosdos', is_active: true },
-  [PROFILE.yosef]: { id: PROFILE.yosef, role: 'community', full_name: 'Yosef Brodie', phone: '+447700900789', affiliation: 'beis_hatalmud', is_active: true },
+  [PROFILE.rov]: { id: PROFILE.rov, role: 'rabbi', full_name: 'Rabbi Yechiel Emanuel', phone: '+447700900001', affiliation: null, organisation: null, is_active: true },
+  [PROFILE.dovid]: { id: PROFILE.dovid, role: 'community', full_name: 'Raffi Goldberg', phone: '+447700900123', affiliation: 'shul_member', organisation: null, is_active: true },
+  [PROFILE.rivky]: { id: PROFILE.rivky, role: 'community', full_name: 'Mrs Geller', phone: '+447700900456', affiliation: 'shul_member', organisation: null, is_active: true },
+  [PROFILE.yosef]: { id: PROFILE.yosef, role: 'community', full_name: 'Anthony Geller', phone: '+447700900789', affiliation: 'mosdos', organisation: 'Jewish High', is_active: true },
 };
 
 export function demoProfile(role: DemoRole): Profile {
@@ -239,4 +239,27 @@ export const demoBriefing =
 
 export const demoHandedOff = [
   { id: 'demo-c-1', phone: '+447700900654', updated_at: hoursFromNow(-2) },
+];
+
+/** Invitations to speak — the Rov answers every one himself. */
+export const demoInvitations: Invitation[] = [
+  {
+    id: 'demo-i-1', ref: 'I-0007', profile_id: PROFILE.dovid,
+    contact_name: null, contact_phone: null, channel: 'app',
+    occasion: 'sheva_brochos',
+    starts_at: nextWeekdayAt(0, 21, 0), duration_minutes: 20,
+    location: 'Simcha hall, 14 Cheltenham Cres',
+    notes: 'Sheva brochos for my daughter.',
+    expected_attendance: 60,
+    status: 'requested', decline_reason: null, responded_at: null, created_at: daysAgo(1),
+  },
+  {
+    id: 'demo-i-2', ref: 'I-0006', profile_id: null,
+    contact_name: 'Anthony Geller', contact_phone: '+447700900789', channel: 'sms',
+    occasion: 'bar_mitzvah',
+    starts_at: nextWeekdayAt(0, 12, 30), duration_minutes: 10,
+    location: 'Hertsmere hall', notes: 'Booked over text — ten minutes is plenty.',
+    expected_attendance: null,
+    status: 'accepted', decline_reason: null, responded_at: daysAgo(0), created_at: daysAgo(3),
+  },
 ];

@@ -14,6 +14,8 @@ export interface Profile {
   full_name: string;
   phone: string | null;
   affiliation: Affiliation | null;
+  /** Which mosad, when affiliation is 'mosdos' — "Jewish High" tells the Rov far more than "mosdos". */
+  organisation: string | null;
   is_active: boolean;
 }
 
@@ -121,4 +123,37 @@ export interface Settings {
   sms_notifications_enabled: boolean;
   briefing_enabled: boolean;
   rabbi_phone: string | null;
+}
+
+export type Occasion = 'sheva_brochos' | 'bar_mitzvah' | 'chanukas_habayis' | 'shloshim' | 'shiur' | 'other';
+
+export const OCCASION_LABELS: Record<Occasion, string> = {
+  sheva_brochos: 'Sheva brochos',
+  bar_mitzvah: 'Bar mitzvah',
+  chanukas_habayis: 'Chanukas habayis',
+  shloshim: 'Shloshim / yahrtzeit',
+  shiur: 'Shiur or event',
+  other: 'Something else',
+};
+
+export type InvitationStatus = 'requested' | 'accepted' | 'declined' | 'cancelled';
+
+/** An invitation for the Rov to speak — a drasha at a simcha, a shiur, an organisation event. */
+export interface Invitation {
+  id: string;
+  ref: string;
+  profile_id: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  channel: 'app' | 'sms' | 'whatsapp' | 'staff';
+  occasion: Occasion;
+  starts_at: string;
+  duration_minutes: number;
+  location: string | null;
+  notes: string | null;
+  expected_attendance: number | null;
+  status: InvitationStatus;
+  decline_reason: string | null;
+  responded_at: string | null;
+  created_at: string;
 }

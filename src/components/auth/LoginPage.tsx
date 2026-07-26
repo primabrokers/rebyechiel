@@ -1,113 +1,200 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { otpRequest, otpVerify } from '../../lib/api';
-import { BigButton, Display, Field, inputCls } from '../shared/ui';
+import { BigButton, Field, Note, Phone, StepBar, inputCls } from '../shared/ui';
 
-// Phone-first login: most community members find a texted code far easier than a password.
-// Email+password stays available behind a toggle (and is how the Rov signs in).
+/**
+ * Signing in is one thing: your number, then the code we text you. No password to remember and
+ * nothing to choose. Email and password is kept behind a quiet link — it is how the Rov and his
+ * helpers get in, not how the kehillah does.
+ */
+
+/** Turns whatever they typed into E.164 — the field shows +44 already, so a leading 0 is theirs. */
+function ukNumber(typed: string): string {
+  const d = typed.replace(/\D/g, '');
+  if (!d) return '';
+  return d.startsWith('0') ? '+44' + d.slice(1) : '+44' + d;
+}
+
+/** Six boxes with one real input behind them — taps anywhere bring the keypad up. */
+function CodeBoxes({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+  return (
+    <div className="relative" onClick={() => ref.current?.focus()}>
+      <input
+        ref={ref}
+        className="absolute inset-0 w-full h-full opacity-0"
+        type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+        value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+        aria-label="The six-digit code we texted you"
+      />
+      <div className="flex gap-2 pointer-events-none">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i}
+            className={'flex-1 aspect-[1/1.15] rounded-md grid place-items-center font-mono text-[24px] font-bold border-[1.5px] ' +
+              (value[i] ? 'border-graphite'
+                : i === value.length ? 'border-indigo bg-indigo-soft'
+                : 'border-firm')}>
+            {value[i] ?? ''}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LoginPage() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<'phone' | 'email'>('phone');
+  const [screen, setScreen] = useState<'welcome' | 'code' | 'email'>('welcome');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(0);
+
+  // Counts down so "send it again" is never the first thing they try.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
   const sendCode = async () => {
     setBusy(true); setError(null);
     try {
-      await otpRequest(phone, 'login');
-      setCodeSent(true);
+      await otpRequest(ukNumber(phone), 'login');
+      setScreen('code'); setResendIn(30); setCode('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : 'Something went wrong — try again in a moment.');
     } finally { setBusy(false); }
   };
 
   const verifyCode = async () => {
     setBusy(true); setError(null);
     try {
-      const res = await otpVerify(phone, code);
-      if (res.needsSignup) {
-        nav('/signup', { state: { phone, verified: true } });
-        return;
-      }
+      const res = await otpVerify(ukNumber(phone), code);
+      if (res.needsSignup) { nav('/signup', { state: { phone: ukNumber(phone), verified: true } }); return; }
       nav('/');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       setError(msg === 'invalid_code' ? 'That code is not right — check the text and try again.'
-        : msg === 'expired' ? 'That code has expired. Send a new one.' : msg);
+        : msg === 'expired' ? 'That code has run out. Send yourself a new one.' : msg);
     } finally { setBusy(false); }
   };
 
   const emailLogin = async () => {
     setBusy(true); setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    if (err) setError('Email or password not recognised.');
-    else nav('/');
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (err) { setError('Email or password not recognised.'); setBusy(false); return; }
     setBusy(false);
+    nav('/');
   };
 
-  return (
-    <div className="min-h-screen flex flex-col justify-center px-6 py-10 max-w-md mx-auto">
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-midnight text-brass-100 font-display text-3xl flex items-center justify-center mx-auto mb-4 shadow-raised">ע</div>
-        <Display className="text-[30px]">Rabbi Emanuel's<br />Assistant</Display>
-        <p className="text-ink-muted text-sm mt-2">Ask a shailah, book a call, arrange a meeting</p>
-      </div>
-
-      {mode === 'phone' ? (
-        <div className="flex flex-col gap-4">
-          {!codeSent ? (
-            <>
-              <Field label="Your mobile number" hint="We'll text you a sign-in code — no password needed.">
-                <input className={inputCls} type="tel" inputMode="tel" placeholder="07123 456789"
-                  value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </Field>
-              <BigButton busy={busy} disabled={phone.replace(/\D/g, '').length < 10} onClick={sendCode}>
-                Text me a code
-              </BigButton>
-            </>
-          ) : (
-            <>
-              <Field label={`Enter the code we texted to ${phone}`}>
-                <input className={inputCls + ' text-center tracking-[0.4em] font-extrabold text-xl'} type="text"
-                  inputMode="numeric" maxLength={6} placeholder="••••••"
-                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-              </Field>
-              <BigButton busy={busy} disabled={code.length < 6} onClick={verifyCode}>Sign in</BigButton>
-              <button className="text-sm font-bold text-royal-600" onClick={() => { setCodeSent(false); setCode(''); }}>
-                Send a different code
-              </button>
-            </>
-          )}
+  // --- the code screen ----------------------------------------------------------------------
+  if (screen === 'code') {
+    return (
+      <Phone tone="surface">
+        <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
+        <div className="px-5 py-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[24px] font-extrabold leading-tight tracking-tight">Check your texts</span>
+            <span className="text-[13.5px] leading-relaxed text-ink-muted">
+              We sent a code to <b className="text-ink">{ukNumber(phone)}</b>. It's good for ten minutes.
+            </span>
+          </div>
+          <CodeBoxes value={code} onChange={setCode} />
+          <BigButton busy={busy} disabled={code.length < 6} onClick={verifyCode}>Sign in</BigButton>
+          {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+          <div className="text-center text-[13px] text-ink-muted">
+            Nothing arrived?{' '}
+            {resendIn > 0
+              ? <span>Send it again · in {resendIn}s</span>
+              : <button className="font-bold text-indigo" onClick={sendCode}>Send it again</button>}
+          </div>
         </div>
-      ) : (
-        <div className="flex flex-col gap-4">
+        <div className="mt-auto px-5 pb-7">
+          <Note icon="☎︎">
+            No smartphone? Text the Rov's number instead and the assistant takes your shailah by text.
+          </Note>
+        </div>
+      </Phone>
+    );
+  }
+
+  // --- email and password, for the Rov and his helpers ---------------------------------------
+  if (screen === 'email') {
+    return (
+      <Phone tone="surface">
+        <StepBar onBack={() => { setScreen('welcome'); setError(null); }} />
+        <div className="px-5 py-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[24px] font-extrabold leading-tight tracking-tight">Sign in with email</span>
+            <span className="text-[13.5px] leading-relaxed text-ink-muted">This is how the Rov and his helpers get in.</span>
+          </div>
           <Field label="Email">
-            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className={inputCls} type="email" autoComplete="username"
+              value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
           <Field label="Password">
-            <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input className={inputCls} type="password" autoComplete="current-password"
+              value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
           <BigButton busy={busy} disabled={!email || !password} onClick={emailLogin}>Sign in</BigButton>
+          {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
         </div>
-      )}
+      </Phone>
+    );
+  }
 
-      {error && <p className="text-danger-text text-sm font-bold text-center mt-4">{error}</p>}
-
-      <div className="text-center mt-8 flex flex-col gap-3">
-        <button className="text-sm font-bold text-royal-600"
-          onClick={() => { setMode(mode === 'phone' ? 'email' : 'phone'); setError(null); }}>
-          {mode === 'phone' ? 'Use email and password instead' : 'Use my mobile number instead'}
-        </button>
-        <p className="text-sm text-ink-muted">
-          First time here? <Link to="/signup" className="font-extrabold text-royal-600">Create an account</Link>
-        </p>
+  // --- the welcome screen -------------------------------------------------------------------
+  return (
+    <Phone tone="graphite">
+      <div className="flex-1 px-6 pt-10 flex flex-col gap-6">
+        <div className="w-[54px] h-[54px] rounded-xl bg-indigo grid place-items-center text-[24px] font-extrabold text-white">ר</div>
+        <div className="flex flex-col gap-2.5">
+          <span className="text-[30px] font-extrabold leading-[1.18] text-white">Rabbi Emanuel's<br />Assistant</span>
+          <span className="text-[14.5px] leading-relaxed text-white/[.62]">
+            Ask a shailah, book a call, invite the Rov to speak. Straight to him — nobody else reads it.
+          </span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {['No password to remember', "You're told when to expect an answer", 'Private questions stay private'].map((t) => (
+            <div key={t} className="flex items-center gap-3">
+              <span className="w-[5px] h-[5px] rounded-pill bg-indigo flex-none" />
+              <span className="text-[13.5px] text-white/[.72]">{t}</span>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+
+      <div className="bg-surface rounded-t-[26px] px-5 pt-6 pb-7 flex flex-col gap-3.5">
+        <div className="flex flex-col gap-2">
+          <span className="text-[13.5px] font-bold text-ink-soft">Your mobile number</span>
+          <div className="flex items-center gap-2.5 border border-firm rounded-lg px-4 py-3.5 focus-within:border-indigo">
+            <span className="font-mono text-[15px] font-bold text-ink-muted">+44</span>
+            <span className="w-px h-[18px] bg-[rgba(16,19,24,.12)]" />
+            <input
+              className="flex-1 min-w-0 bg-transparent font-mono text-[15px] tracking-[0.04em] text-ink placeholder:text-ink-ghost focus:outline-none"
+              type="tel" inputMode="tel" autoComplete="tel" placeholder="7700 900123"
+              value={phone} onChange={(e) => setPhone(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && phone.replace(/\D/g, '').length >= 9) sendCode(); }}
+            />
+          </div>
+          <span className="text-[12.5px] leading-snug text-ink-muted">We text you a six-digit code. That's the whole sign-in.</span>
+        </div>
+        <BigButton busy={busy} disabled={phone.replace(/\D/g, '').length < 9} onClick={sendCode}>Text me a code</BigButton>
+        {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+        <div className="text-center text-[13px] text-ink-muted">
+          First time here? <Link to="/signup" className="font-extrabold text-indigo">Create an account</Link>
+        </div>
+        <button className="text-[12.5px] font-bold text-ink-muted" onClick={() => { setScreen('email'); setError(null); }}>
+          Sign in with email instead
+        </button>
+      </div>
+    </Phone>
   );
 }

@@ -25,6 +25,8 @@ async function demoResponse(action: string, payload: Record<string, unknown>): P
           expected_reply_text: 'The Rov expects to answer later today (by this evening).',
         },
       };
+    case 'submit_invitation':
+      return { invitation: { id: 'demo-new-i', ref: 'I-0008', status: 'requested' } };
     case 'my_requests':
       return { shailos: demoMyShailos, bookings: demoBookings };
     default:
@@ -66,7 +68,7 @@ export async function otpRequest(phone: string, mode: 'login' | 'signup') {
 export async function otpVerify(
   phone: string,
   code: string,
-  signup?: { fullName: string; affiliation: string },
+  signup?: { fullName: string; affiliation: string; organisation?: string },
 ) {
   const { data, error } = await supabase.functions.invoke('rabbi-otp-verify', { body: { phone, code, signup } });
   if (error) {

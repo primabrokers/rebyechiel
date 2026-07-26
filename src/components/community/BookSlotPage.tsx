@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarCheck } from 'lucide-react';
-import clsx from 'clsx';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { Slot } from '../../types';
-import { BigButton, Display, EmptyState, Spinner } from '../shared/ui';
+import {
+  BigButton, Choice, EmptyState, Headline, Note, Phone, PromisePanel, Spinner, StepBar, textareaCls,
+} from '../shared/ui';
 import { fmtSlot } from '../../lib/format';
 
-// Pick a released slot; meetings collect a short purpose so the Rov can decide.
+/**
+ * Booking a call or asking to meet. Calls take a time the Rov has already opened and are simply
+ * his — a meeting is a request, and the screen never pretends otherwise.
+ */
 export function BookSlotPage() {
   const nav = useNavigate();
   const { slotType = 'call' } = useParams();
@@ -50,79 +53,91 @@ export function BookSlotPage() {
   if (done) {
     const confirmed = done.status === 'confirmed';
     return (
-      <div className="min-h-screen max-w-md mx-auto px-6 pt-16 pb-10 flex flex-col gap-5 text-center">
-        <div className="w-[92px] h-[92px] rounded-full mx-auto flex items-center justify-center text-brass-100 shadow-raised"
-          style={{ background: 'radial-gradient(circle at 32% 28%, #2C4E7E, #0F1E33)' }}>
-          <CalendarCheck size={38} />
+      <Phone tone="surface">
+        <div className="flex-1 px-6 pt-16 flex flex-col gap-5">
+          <div className={'w-[62px] h-[62px] rounded-xl grid place-items-center text-[26px] text-white ' +
+            (confirmed ? 'bg-good' : 'bg-graphite')}>
+            {type === 'call' ? '☎︎' : '◍'}
+          </div>
+          <Headline
+            title={confirmed ? <>That's booked<br />in his diary</> : <>Your request is<br />with the Rov</>}
+            sub={confirmed
+              ? (type === 'call' ? 'He rings you then. We text you an hour before.' : "He'll see you then.")
+              : "He confirms meetings himself. We'll text you as soon as he answers."}
+          />
+          <PromisePanel
+            eyebrow={confirmed ? 'When' : 'You asked for'}
+            headline={chosen ? fmtSlot(chosen.startsAt) : ''}
+            sub={<>Your reference is <b className="font-mono">{done.ref}</b>.</>}
+          />
         </div>
-        <Display className="text-[27px]">{confirmed ? 'Booked' : 'Request sent to the Rov'}</Display>
-        <div className="bg-surface rounded-xl shadow-card p-4">
-          <div className="font-display font-semibold text-[21px] text-midnight">{chosen && fmtSlot(chosen.startsAt)}</div>
-          <p className="text-[13px] text-ink-muted mt-1">
-            {confirmed
-              ? `The Rov will ${type === 'call' ? 'call you' : 'see you'} then · Ref ${done.ref}`
-              : `We'll text you as soon as the Rov confirms · Ref ${done.ref}`}
-          </p>
+        <div className="px-5 pb-7">
+          <BigButton onClick={() => nav('/')}>Back to home</BigButton>
         </div>
-        <BigButton tone="ghost" onClick={() => nav('/')}>Back to home</BigButton>
-      </div>
+      </Phone>
     );
   }
 
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 pt-6 pb-10 flex flex-col gap-4">
-      <div className="flex items-center gap-3 px-1">
-        <Link to="/" className="p-2 -ml-2 text-ink-soft"><ArrowLeft size={22} /></Link>
-      </div>
-      <div className="px-1.5">
-        <Display className="text-[25px]">{type === 'call' ? 'Book a phone call' : 'Request a meeting'}</Display>
-        <p className="text-[13.5px] text-ink-muted mt-1">
-          {type === 'call'
-            ? 'Times the Rov has set aside for calls. He rings you.'
-            : 'Pick a time — the Rov confirms meeting requests himself.'}
-        </p>
-      </div>
+    <Phone tone="surface">
+      <StepBar onBack={() => nav('/')} />
 
-      {!slots && !error && <Spinner />}
-      {error && <p className="text-danger-text text-sm font-bold text-center">{error}</p>}
-      {slots && slots.length === 0 && (
-        <EmptyState title={`No ${type} times are open right now`}
-          sub="The Rov releases new times regularly — check back soon, or send a shailah instead." />
-      )}
-
-      {slots && slots.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          {slots.map((s) => (
-            <button key={s.releaseId + s.startsAt} type="button" onClick={() => setChosen(s)}
-              className={clsx(
-                'rounded-xl bg-surface shadow-card px-4 py-4 text-left border-2 transition-colors',
-                chosen?.startsAt === s.startsAt && chosen?.releaseId === s.releaseId
-                  ? 'border-brass-500 bg-[#FDFAF2]' : 'border-transparent',
-              )}>
-              <div className="font-extrabold text-[15.5px] tracking-tight">{fmtSlot(s.startsAt)}</div>
-              <div className="text-[12.5px] text-ink-muted mt-0.5">
-                {Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / 60000)}-minute {type === 'call' ? 'phone call' : 'meeting'}
-                {s.location ? ` · ${s.location}` : ''}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {chosen && type === 'meeting' && (
-        <textarea
-          className="w-full rounded-xl border-0 bg-surface shadow-card px-4 py-3.5 text-[15px] min-h-[90px] focus:outline-none focus:ring-2 focus:ring-royal-500 resize-none"
-          placeholder="What is the meeting about? (a line is enough)"
-          value={purpose}
-          onChange={(e) => setPurpose(e.target.value)}
+      <div className="px-5 py-4 flex flex-col gap-3.5">
+        <Headline
+          title={type === 'call' ? 'Book a phone call' : 'Ask to meet'}
+          sub={type === 'call'
+            ? 'These are times the Rov has set aside for calls. He rings you.'
+            : 'Pick a time that suits — he confirms meetings himself.'}
         />
-      )}
+
+        {!slots && !error && <Spinner />}
+        {error && <p className="text-[13px] font-bold text-late text-center">{error}</p>}
+
+        {slots && slots.length === 0 && (
+          <>
+            <EmptyState title={`No ${type === 'call' ? 'call' : 'meeting'} times are open right now`}
+              sub="The Rov opens new times regularly." />
+            <Note icon="✦">
+              If it can be answered in writing, a shailah reaches him sooner than a call does.
+            </Note>
+            <BigButton tone="outline" onClick={() => nav('/ask')}>Ask a shailah instead</BigButton>
+          </>
+        )}
+
+        {slots && slots.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {slots.map((s) => (
+              <Choice key={s.releaseId + s.startsAt}
+                selected={chosen?.startsAt === s.startsAt && chosen?.releaseId === s.releaseId}
+                onClick={() => setChosen(s)}
+                title={fmtSlot(s.startsAt)}
+                sub={`${Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / 60000)}-minute ${
+                  type === 'call' ? 'phone call' : 'meeting'}${s.location ? ` · ${s.location}` : ''}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {chosen && type === 'meeting' && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-bold text-ink-soft">What is it about?</span>
+            <textarea className={textareaCls + ' min-h-[84px] text-[13.5px]'}
+              placeholder="A line is enough — it helps him come prepared."
+              value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+          </label>
+        )}
+      </div>
 
       {chosen && (
-        <BigButton busy={busy} onClick={book}>
-          {type === 'call' ? `Book ${fmtSlot(chosen.startsAt)}` : `Request ${fmtSlot(chosen.startsAt)}`}
-        </BigButton>
+        <div className="mt-auto px-5 pt-3 pb-7 flex flex-col gap-2">
+          <BigButton busy={busy} onClick={book}>
+            {type === 'call' ? `Book ${fmtSlot(chosen.startsAt)}` : `Ask for ${fmtSlot(chosen.startsAt)}`}
+          </BigButton>
+          <span className="text-[11.5px] text-center text-ink-muted">
+            {type === 'call' ? 'The Rov rings you — no need to ring him.' : 'Nothing goes in his diary until he says yes.'}
+          </span>
+        </div>
       )}
-    </div>
+    </Phone>
   );
 }

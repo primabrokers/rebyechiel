@@ -1,7 +1,7 @@
 // Minimal service worker: network-first for navigation (so deploys land immediately), with a
 // cached app-shell fallback for offline opens on the tablet. Static assets are cache-first —
 // Vite fingerprints them, so stale entries are impossible.
-const CACHE = 'rabbi-app-v1';
+const CACHE = 'rabbi-app-v2';  // bumped with the Rov Console redesign
 const SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {

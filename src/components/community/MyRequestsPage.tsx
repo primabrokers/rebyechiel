@@ -1,88 +1,137 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../lib/supabase';
-import { demoBookings, demoMyShailos, isDemo } from '../../lib/demo';
+import { demoBookings, demoInvitations, demoMyShailos, isDemo } from '../../lib/demo';
 import { api } from '../../lib/api';
-import type { Booking, Shailah } from '../../types';
-import { BigButton, Display, EmptyState, Pill, SectionLabel, Spinner } from '../shared/ui';
+import { OCCASION_LABELS, type Booking, type Invitation, type Shailah } from '../../types';
+import {
+  BigButton, Chip, EmptyState, Eyebrow, Headline, Mono, Phone, PromisePanel, Spinner, StepBar,
+  type ChipTone,
+} from '../shared/ui';
 import { fmtDate, fmtSlot } from '../../lib/format';
 
-const SHAILAH_PILL: Record<string, { tone: 'ok' | 'warn' | 'bad' | 'info'; label: string }> = {
+const SHAILAH_STATE: Record<string, { tone: ChipTone; label: string }> = {
   new: { tone: 'warn', label: 'With the Rov' },
   triaged: { tone: 'warn', label: 'With the Rov' },
   in_progress: { tone: 'warn', label: 'Being looked at' },
-  answered: { tone: 'ok', label: 'Answered' },
-  closed: { tone: 'info', label: 'Closed' },
-  withdrawn: { tone: 'info', label: 'Withdrawn' },
+  answered: { tone: 'good', label: 'Answered' },
+  closed: { tone: 'neutral', label: 'Closed' },
+  withdrawn: { tone: 'neutral', label: 'Withdrawn' },
 };
-const BOOKING_PILL: Record<string, { tone: 'ok' | 'warn' | 'bad' | 'info'; label: string }> = {
-  requested: { tone: 'warn', label: 'Awaiting the Rov' },
-  confirmed: { tone: 'ok', label: 'Confirmed' },
-  declined: { tone: 'bad', label: 'Not possible' },
-  rescheduled: { tone: 'warn', label: 'Rescheduled' },
-  cancelled: { tone: 'info', label: 'Cancelled' },
-  completed: { tone: 'info', label: 'Done' },
+const BOOKING_STATE: Record<string, { tone: ChipTone; label: string }> = {
+  requested: { tone: 'warn', label: 'With the Rov' },
+  confirmed: { tone: 'good', label: 'Confirmed' },
+  declined: { tone: 'late', label: 'Not possible' },
+  rescheduled: { tone: 'warn', label: 'Moved' },
+  cancelled: { tone: 'neutral', label: 'Cancelled' },
+  completed: { tone: 'neutral', label: 'Done' },
+};
+const INVITATION_STATE: Record<string, { tone: ChipTone; label: string }> = {
+  requested: { tone: 'warn', label: 'With the Rov' },
+  accepted: { tone: 'good', label: 'He said yes' },
+  declined: { tone: 'late', label: 'Not this time' },
+  cancelled: { tone: 'neutral', label: 'Cancelled' },
 };
 
+/** Everything you have ever asked of the Rov, newest first. */
 export function MyRequestsPage() {
+  const nav = useNavigate();
   const [shailos, setShailos] = useState<Shailah[] | null>(null);
   const [bookings, setBookings] = useState<Booking[] | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[] | null>(null);
 
   useEffect(() => {
-    if (isDemo()) { setShailos(demoMyShailos); setBookings(demoBookings); return; }
+    if (isDemo()) {
+      setShailos(demoMyShailos); setBookings(demoBookings); setInvitations(demoInvitations);
+      return;
+    }
     supabase.from('rabbi_shailos').select('*').order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => setShailos((data as Shailah[]) ?? []));
     supabase.from('rabbi_bookings').select('*').order('starts_at', { ascending: false }).limit(50)
       .then(({ data }) => setBookings((data as Booking[]) ?? []));
+    supabase.from('rabbi_invitations').select('*').order('starts_at', { ascending: false }).limit(50)
+      .then(({ data }) => setInvitations((data as Invitation[]) ?? []));
   }, []);
 
-  if (!shailos || !bookings) return <Spinner />;
+  if (!shailos || !bookings || !invitations) return <Phone><Spinner /></Phone>;
+
+  const nothing = !shailos.length && !bookings.length && !invitations.length;
 
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 pt-6 pb-10 flex flex-col gap-3">
-      <div className="flex items-center gap-3 px-1">
-        <Link to="/" className="p-2 -ml-2 text-ink-soft"><ArrowLeft size={22} /></Link>
-        <Display className="text-[24px]">My requests</Display>
+    <Phone>
+      <StepBar onBack={() => nav('/')} />
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <Headline title="Where things stand" />
+
+        {nothing && (
+          <EmptyState title="Nothing here yet" sub="Ask a shailah or book a call from the home screen." />
+        )}
+
+        {shailos.length > 0 && <Eyebrow className="pt-1">Questions</Eyebrow>}
+        {shailos.map((s) => {
+          const state = SHAILAH_STATE[s.status] ?? { tone: 'neutral' as ChipTone, label: s.status };
+          return (
+            <Link key={s.id} to={`/requests/${s.id}`} className="bg-surface border rounded-lg p-3.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <Mono className="text-[11.5px]">{s.ref}</Mono>
+                <span className="ml-auto"><Chip tone={state.tone}>{state.label}</Chip></span>
+              </div>
+              <span className="text-[13.5px] leading-snug line-clamp-2">{s.question}</span>
+              <span className="text-[12px] text-ink-faint">Asked {fmtDate(s.created_at)}</span>
+            </Link>
+          );
+        })}
+
+        {bookings.length > 0 && <Eyebrow className="pt-1">Calls and meetings</Eyebrow>}
+        {bookings.map((b) => {
+          const state = BOOKING_STATE[b.status] ?? { tone: 'neutral' as ChipTone, label: b.status };
+          return (
+            <div key={b.id} className="bg-surface border rounded-lg p-3.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[13.5px] font-extrabold">
+                  {b.slot_type === 'call' ? 'Phone call' : 'Meeting'} · {fmtSlot(b.starts_at)}
+                </span>
+                <span className="ml-auto"><Chip tone={state.tone}>{state.label}</Chip></span>
+              </div>
+              {b.status === 'declined' && (
+                <span className="text-[12.5px] leading-snug text-ink-soft">
+                  {b.decline_reason ? `The Rov: “${b.decline_reason}”` : 'The Rov could not make this time.'} You're
+                  welcome to pick another.
+                </span>
+              )}
+              <Mono className="text-[11.5px]">{b.ref}</Mono>
+            </div>
+          );
+        })}
+
+        {invitations.length > 0 && <Eyebrow className="pt-1">Invitations to speak</Eyebrow>}
+        {invitations.map((i) => {
+          const state = INVITATION_STATE[i.status] ?? { tone: 'neutral' as ChipTone, label: i.status };
+          return (
+            <div key={i.id} className="bg-surface border rounded-lg p-3.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[13.5px] font-extrabold truncate">
+                  {OCCASION_LABELS[i.occasion]} · {fmtSlot(i.starts_at)}
+                </span>
+                <span className="ml-auto flex-none"><Chip tone={state.tone}>{state.label}</Chip></span>
+              </div>
+              <span className="text-[12.5px] text-ink-soft">
+                {i.duration_minutes} minutes{i.location ? ` · ${i.location}` : ''}
+              </span>
+              {i.status === 'declined' && i.decline_reason && (
+                <span className="text-[12.5px] leading-snug text-ink-soft">The Rov: “{i.decline_reason}”</span>
+              )}
+              <Mono className="text-[11.5px]">{i.ref}</Mono>
+            </div>
+          );
+        })}
       </div>
-
-      {shailos.length === 0 && bookings.length === 0 && (
-        <EmptyState title="Nothing here yet" sub="Ask a shailah or book a call from the home screen." />
-      )}
-
-      {bookings.length > 0 && <SectionLabel>Calls & meetings</SectionLabel>}
-      {bookings.map((b) => (
-        <div key={b.id} className="bg-surface rounded-xl shadow-card p-4 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-extrabold text-[15.5px] tracking-tight">
-              {b.slot_type === 'call' ? 'Phone call' : 'Meeting'} · {fmtSlot(b.starts_at)}
-            </span>
-            <Pill tone={BOOKING_PILL[b.status]?.tone ?? 'info'}>{BOOKING_PILL[b.status]?.label ?? b.status}</Pill>
-          </div>
-          {b.status === 'declined' && (
-            <p className="text-[13px] text-ink-soft">
-              {b.decline_reason ? `The Rov: "${b.decline_reason}"` : 'The Rov could not make this time.'} You're welcome to book another.
-            </p>
-          )}
-          <p className="text-[12px] text-ink-faint">Ref {b.ref}</p>
-        </div>
-      ))}
-
-      {shailos.length > 0 && <SectionLabel>Questions</SectionLabel>}
-      {shailos.map((s) => (
-        <Link key={s.id} to={`/requests/${s.id}`} className="bg-surface rounded-xl shadow-card p-4 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-extrabold text-[15.5px] tracking-tight">Question {s.ref}</span>
-            <Pill tone={SHAILAH_PILL[s.status]?.tone ?? 'info'}>{SHAILAH_PILL[s.status]?.label ?? s.status}</Pill>
-          </div>
-          <p className="text-[13px] text-ink-muted line-clamp-1">{s.question}</p>
-          <p className="text-[12px] text-ink-faint">Asked {fmtDate(s.created_at)}</p>
-        </Link>
-      ))}
-    </div>
+    </Phone>
   );
 }
 
+/** One question: the Rov's answer if it has come, the promise if it hasn't. */
 export function RequestDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -95,8 +144,8 @@ export function RequestDetailPage() {
       .then(({ data }) => setShailah((data as Shailah | null) ?? null));
   }, [id]);
 
-  if (shailah === undefined) return <Spinner />;
-  if (shailah === null) return <EmptyState title="Not found" />;
+  if (shailah === undefined) return <Phone><Spinner /></Phone>;
+  if (shailah === null) return <Phone><EmptyState title="Not found" /></Phone>;
 
   const withdraw = async () => {
     setBusy(true);
@@ -106,44 +155,62 @@ export function RequestDetailPage() {
     } finally { setBusy(false); }
   };
 
+  const answered = shailah.status === 'answered' || shailah.status === 'closed';
+
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 pt-6 pb-10 flex flex-col gap-4">
-      <div className="flex items-center gap-3 px-1">
-        <Link to="/requests" className="p-2 -ml-2 text-ink-soft"><ArrowLeft size={22} /></Link>
-        <Display className="text-[24px]">Question {shailah.ref}</Display>
-      </div>
+    <Phone>
+      <StepBar onBack={() => nav('/requests')} right={<Mono className="text-[11.5px]">{shailah.ref}</Mono>} />
 
-      <div className="bg-royal-100 rounded-xl p-4 text-[14.5px] text-ink-soft leading-relaxed">
-        <span className="font-extrabold text-ink block mb-1">Your question</span>
-        {shailah.question}
-      </div>
+      <div className="px-5 py-4 flex flex-col gap-3.5">
+        {answered && (
+          <div className="flex items-center gap-2.5">
+            <span className="w-[9px] h-[9px] rounded-pill bg-good flex-none" />
+            <Eyebrow className="!text-good">
+              Answered{shailah.answered_at ? ` · ${formatDistanceToNow(new Date(shailah.answered_at))} ago` : ''}
+            </Eyebrow>
+          </div>
+        )}
 
-      {shailah.status === 'answered' || shailah.status === 'closed' ? (
-        shailah.answer ? (
-          <div className="bg-surface rounded-xl shadow-card p-5">
-            <div className="text-[11.5px] uppercase tracking-[0.12em] font-extrabold text-brass-500 mb-2">The Rov's answer</div>
-            <p className="font-display text-[18px] leading-relaxed whitespace-pre-wrap">{shailah.answer}</p>
-            {shailah.answered_at && <p className="text-[12px] text-ink-faint mt-3">Answered {fmtDate(shailah.answered_at)}</p>}
-          </div>
-        ) : (
-          <div className="bg-surface rounded-xl shadow-card p-5 text-[14.5px] text-ink-soft">
-            The Rov has dealt with this — he will speak to you directly rather than answer in writing.
-          </div>
-        )
-      ) : shailah.status === 'withdrawn' ? (
-        <p className="text-[14px] text-ink-muted text-center">You withdrew this question.</p>
-      ) : (
-        <>
-          <div className="bg-surface rounded-xl shadow-card p-4">
-            <div className="text-[11.5px] uppercase tracking-[0.12em] font-extrabold text-ink-muted">Expected answer</div>
-            <div className="font-display font-semibold text-[20px] text-midnight mt-0.5">
-              {(shailah.expected_reply_text ?? 'As soon as the Rov can.').replace('The Rov expects to answer ', '').replace(/\.$/, '')}
+        {answered && (
+          <div className="bg-surface border rounded-xl p-5 flex flex-col gap-2.5">
+            <Eyebrow>The Rov's answer</Eyebrow>
+            {shailah.answer ? (
+              <p className="text-[15.5px] leading-[1.65] text-pretty whitespace-pre-wrap">{shailah.answer}</p>
+            ) : (
+              <p className="text-[14.5px] leading-relaxed text-ink-soft">
+                The Rov has dealt with this — he'll speak to you directly rather than answer in writing.
+              </p>
+            )}
+            <div className="h-px bg-[rgba(16,19,24,.08)] my-0.5" />
+            <div className="flex gap-2.5">
+              <button onClick={() => nav('/ask')}
+                className="flex-1 rounded-ctl bg-canvas py-2.5 text-[13px] font-bold">Ask a follow-up</button>
             </div>
-            <p className="text-[12.5px] text-ink-muted mt-1">We'll text you the moment it's ready.</p>
           </div>
-          <BigButton tone="quiet" busy={busy} onClick={withdraw}>Withdraw this question</BigButton>
-        </>
-      )}
-    </div>
+        )}
+
+        <div className="bg-surface border rounded-xl p-4 flex flex-col gap-1.5">
+          <Eyebrow>What you asked</Eyebrow>
+          <p className="text-[13.5px] leading-relaxed text-ink-soft whitespace-pre-wrap">{shailah.question}</p>
+          <span className="text-[12px] text-ink-faint">Asked {fmtDate(shailah.created_at)}</span>
+        </div>
+
+        {!answered && shailah.status === 'withdrawn' && (
+          <p className="text-[13.5px] text-ink-muted text-center">You withdrew this question.</p>
+        )}
+
+        {!answered && shailah.status !== 'withdrawn' && (
+          <>
+            <PromisePanel
+              eyebrow="You'll have an answer"
+              headline={(shailah.expected_reply_text ?? 'As soon as the Rov reaches it.')
+                .replace('The Rov expects to answer ', '').replace(/\.$/, '')}
+              sub="We'll text you the moment it's ready."
+            />
+            <BigButton tone="quiet" busy={busy} onClick={withdraw}>Withdraw this question</BigButton>
+          </>
+        )}
+      </div>
+    </Phone>
   );
 }

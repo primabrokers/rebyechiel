@@ -1,70 +1,84 @@
 import type { Config } from 'tailwindcss';
 
-// Design language v2 (see the approved mock-ups): warm paper ground, deep midnight blue, one
-// brass accent, editorial serif display for headlines, borderless elevated cards. Larger-than-
-// usual type throughout — many users (including the Rov) are not comfortable with small text.
+/**
+ * Design system — "Rov Console" (source screens kept in design/).
+ *
+ * Cool graphite console with a single indigo accent. Manrope carries everything; JetBrains Mono
+ * is reserved for things that should read as data — times, refs, phone numbers, dates. There is
+ * no second accent: green means settled, amber means waiting on a person, red means promised
+ * today.
+ */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
-        display: ['Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Book Antiqua', 'Georgia', 'serif'],
-      },
-      fontSize: {
-        base: ['16px', { lineHeight: '1.6' }],
+        sans: ['Manrope', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
-        paper: '#F6F3ED',
-        surface: '#FFFFFF',
-        hover: '#EFEBE2',
-        separator: '#E2DDD0',
-        midnight: {
-          DEFAULT: '#0F1E33',
-          2: '#1D3557',
-          3: '#274B7E',
-        },
-        royal: {
-          50: '#F1F4F9',
-          100: '#EDF2F9', // "mist" fill for icon tiles and info chips
-          200: '#B4C4DC',
-          300: '#87A0C3',
-          400: '#54749F',
-          500: '#2E5382',
-          600: '#24466E',
-          700: '#1D3557',
-          800: '#16294A',
-          900: '#0F1E33',
-        },
-        brass: {
-          100: '#F3E8CF',
-          300: '#D8C289',
-          500: '#B98A2F',
-          600: '#9A7326',
-          700: '#7B5C1E',
+        page: '#e9eaee',      // the shell around a console
+        canvas: '#f4f5f7',    // working surface
+        surface: '#ffffff',   // cards, tables, drawers
+        subtle: '#fafbfc',    // table headers, hovered rows
+        chip: '#f0f1f4',      // neutral chips and icon tiles
+        graphite: {
+          DEFAULT: '#12141a', // sidebar, member masthead, primary buttons
+          deep: '#0b0d12',
+          900: '#101318',
         },
         ink: {
-          DEFAULT: '#1C2026',
-          soft: '#4A5058',
-          muted: '#7A818B',
-          faint: '#A6ACB6',
+          DEFAULT: '#101318',
+          soft: '#4b5361',
+          muted: '#79828f',
+          faint: '#a7aeb8',
+          ghost: '#c2c8d0',
         },
-        success: { bg: '#E4F3EC', text: '#157A55' },
-        warning: { bg: '#F9F0DA', text: '#8A6215' },
-        danger: { bg: '#FAE9E5', text: '#A33224' },
-        info: { bg: '#EDF2F9', text: '#24466E' },
+        indigo: {
+          DEFAULT: '#5b4be8',
+          deep: '#4536cc',
+          ink: '#2f2861',   // indigo text on a light indigo ground
+          soft: '#f4f2ff',  // light indigo panel
+          softer: '#f8f7ff',
+          tint: '#ece9ff',
+          light: '#a99bff', // indigo on a dark ground
+          mid: '#6f63c4',
+        },
+        good: { DEFAULT: '#12795a', deep: '#0d6247', bg: '#e6f5ef', dot: '#3fbb84' },
+        warn: { DEFAULT: '#a9700f', ink: '#8a5c0d', bg: '#fbf2e0' },
+        late: { DEFAULT: '#c93b2b', bg: '#fdeeec' },
+      },
+      borderColor: {
+        DEFAULT: 'rgba(16,19,24,.09)',
+        hair: 'rgba(16,19,24,.06)',
+        firm: 'rgba(16,19,24,.14)',
+        strong: 'rgba(16,19,24,.25)',
       },
       borderRadius: {
-        md: '10px',
-        lg: '15px',
-        xl: '20px',
-        '2xl': '26px',
+        chip: '6px',
+        ctl: '9px',
+        md: '11px',
+        lg: '13px',
+        xl: '16px',
+        pill: '99px',
       },
       boxShadow: {
-        card: '0 2px 10px rgba(15, 30, 51, 0.06)',
-        raised: '0 16px 40px rgba(15, 30, 51, 0.10), 0 3px 8px rgba(15, 30, 51, 0.05)',
-        cta: '0 10px 22px rgba(15, 30, 51, 0.25)',
-        tabbar: '0 14px 34px rgba(10, 18, 32, 0.4)',
+        drawer: '-20px 0 50px rgba(11,13,18,.22)',
+        toast: '0 12px 30px rgba(11,13,18,.3)',
+        phone: '0 20px 50px rgba(11,13,18,.2)',
+        lift: '0 6px 18px rgba(11,13,18,.08)',
+      },
+      keyframes: {
+        slideIn: { from: { transform: 'translateX(24px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },
+        fadeUp: { from: { opacity: '0', transform: 'translateY(10px)' }, to: { opacity: '1', transform: 'none' } },
+        toastIn: { from: { opacity: '0', transform: 'translate(-50%,14px)' }, to: { opacity: '1', transform: 'translate(-50%,0)' } },
+        breathe: { '0%,100%': { opacity: '1' }, '50%': { opacity: '.4' } },
+      },
+      animation: {
+        slideIn: 'slideIn .26s cubic-bezier(.22,.8,.3,1) both',
+        fadeUp: 'fadeUp .3s ease both',
+        toastIn: 'toastIn .25s ease both',
+        breathe: 'breathe 2.6s ease-in-out infinite',
       },
     },
   },

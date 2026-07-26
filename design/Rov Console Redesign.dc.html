@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box}
+body{margin:0;background:#e9eaee;font-family:Manrope,system-ui,sans-serif;color:#101318;-webkit-font-smoothing:antialiased}
+a{color:#5b4be8;text-decoration:none}a:hover{color:#4536cc}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:rgba(16,19,24,.16);border-radius:99px;border:3px solid transparent;background-clip:padding-box}
+@keyframes slideIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,14px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.4}}
+</style></helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 60px">
+
+<div style="position:sticky;top:0;z-index:60;width:100%;min-width:max-content;display:flex;justify-content:center;padding:14px 24px;background:rgba(233,234,238,.86);backdrop-filter:blur(12px);border-bottom:1px solid rgba(16,19,24,.08)">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="font:800 12px Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#79828f">Rov · redesign</div>
+    <div style="display:flex;gap:4px;padding:4px;flex:none;background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:10px">
+      <sc-for list="{{ views }}" as="v" hint-placeholder-count="3">
+        <div onClick="{{ v.go }}" style="padding:7px 14px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;background:{{ v.bg }};color:{{ v.fg }}">{{ v.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+
+<div style="padding:28px 24px 0;display:flex;flex-direction:column;align-items:center;gap:12px">
+
+<sc-if value="{{ isConsole }}" hint-placeholder-val="{{ true }}">
+<div style="width:1320px;max-width:100%;display:flex;flex-direction:column;gap:10px">
+  <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding-left:2px">
+    <div style="font:800 14px Manrope,sans-serif">The Rov's console — tablet or desktop</div>
+    <div style="font-size:12.5px;color:#79828f">Sized for a tablet in landscape. Every panel says what it is and what to do — click a question to answer it.</div>
+  </div>
+
+  <div style="width:100%;height:840px;background:#f4f5f7;border:1px solid rgba(16,19,24,.12);border-radius:16px;overflow:hidden;display:grid;grid-template-columns:236px 1fr;position:relative">
+
+    <div style="background:#12141a;display:flex;flex-direction:column;padding:20px 14px;gap:22px">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 8px">
+        <div style="width:32px;height:32px;border-radius:9px;background:#5b4be8;display:grid;place-items:center;font:800 14px Manrope,sans-serif;color:#fff">ר</div>
+        <div style="display:flex;flex-direction:column"><span style="font:800 14px Manrope,sans-serif;color:#fff">Rov</span><span style="font:500 10.5px 'JetBrains Mono',monospace;color:rgba(255,255,255,.4)">R. Y. Emanuel</span></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+          <div onClick="{{ n.go }}" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:9px;cursor:pointer;background:{{ n.bg }};transition:background .15s" style-hover="background:rgba(255,255,255,.07)">
+            <span style="width:18px;text-align:center;font-size:14px;color:{{ n.fg }}">{{ n.icon }}</span>
+            <span style="font-size:13.5px;font-weight:700;color:{{ n.fg }}">{{ n.label }}</span>
+            <span style="margin-left:auto;font:700 11px 'JetBrains Mono',monospace;color:{{ n.badgeFg }};background:{{ n.badgeBg }};padding:2px 7px;border-radius:99px">{{ n.badge }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+        <div style="padding:13px;border-radius:11px;background:rgba(91,75,232,.16);border:1px solid rgba(91,75,232,.35);display:flex;flex-direction:column;gap:5px">
+          <div style="font:800 10.5px Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#a99bff">Text-in line</div>
+          <div style="font-size:12.5px;line-height:1.45;color:rgba(255,255,255,.72)">One caller needs a person. The assistant couldn't finish it by text.</div>
+          <div style="font-size:12.5px;font-weight:700;color:#fff;cursor:pointer">Show the number →</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.05)">
+          <span style="width:7px;height:7px;border-radius:99px;background:#3fbb84;animation:breathe 2.6s ease-in-out infinite"></span>
+          <span style="font-size:11.5px;color:rgba(255,255,255,.6)">Everything saved</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:64px;flex:none;display:flex;align-items:center;gap:16px;padding:0 26px;background:#fff;border-bottom:1px solid rgba(16,19,24,.09)">
+        <div style="display:flex;flex-direction:column">
+          <span style="font:800 16px Manrope,sans-serif">{{ pageTitle }}</span>
+          <span style="font-size:12px;color:#79828f">{{ pageSub }}</span>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;background:#f4f5f7;border:1px solid rgba(16,19,24,.07);width:250px">
+            <span style="color:#a7aeb8;font-size:13px">⌕</span>
+            <span style="font-size:13px;color:#a7aeb8">Search a name or question</span>
+            <span style="margin-left:auto;font:500 10px 'JetBrains Mono',monospace;color:#c2c8d0">⌘K</span>
+          </div>
+          <div style="padding:9px 15px;border-radius:9px;background:#5b4be8;color:#fff;font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#4536cc">Open times for calls</div>
+        </div>
+      </div>
+
+      <div style="flex:1;overflow:auto;padding:24px 26px 30px">
+
+        <sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:20px;animation:fadeUp .3s ease both">
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+            <sc-for list="{{ signals }}" as="s" hint-placeholder-count="3">
+              <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:17px 18px;display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:border-color .15s,transform .15s" style-hover="border-color:rgba(16,19,24,.25);transform:translateY(-2px)">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="width:8px;height:8px;border-radius:99px;background:{{ s.dot }}"></span>
+                  <span style="font:800 11px Manrope,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#79828f">{{ s.label }}</span>
+                </div>
+                <div style="display:flex;align-items:baseline;gap:9px">
+                  <span style="font:800 34px/1 Manrope,sans-serif;font-variant-numeric:tabular-nums;color:{{ s.numFg }}">{{ s.n }}</span>
+                  <span style="font-size:13px;color:#4b5361">{{ s.unit }}</span>
+                </div>
+                <div style="font-size:12.5px;line-height:1.45;color:#79828f">{{ s.hint }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#12141a;border-radius:13px;padding:20px 22px;display:flex;gap:20px;align-items:flex-start">
+            <div style="width:40px;height:40px;border-radius:11px;background:rgba(91,75,232,.25);display:grid;place-items:center;font-size:17px;color:#a99bff;flex:none">◈</div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font:800 11px Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#a99bff">Your morning briefing</span>
+                <span style="font:500 10.5px 'JetBrains Mono',monospace;color:rgba(255,255,255,.35)">sent 06:40 · also texted to you</span>
+              </div>
+              <div style="font-size:14.5px;line-height:1.65;color:rgba(255,255,255,.85);max-width:820px;white-space:pre-line">{{ briefing }}</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:18px;align-items:start">
+
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:baseline;gap:10px">
+                <span style="font:800 15px Manrope,sans-serif">Needs you today</span>
+                <span style="font-size:12.5px;color:#79828f">Sorted by what you promised the person</span>
+                <span onClick="{{ goQuestions }}" style="margin-left:auto;font-size:12.5px;font-weight:700;color:#5b4be8;cursor:pointer">See all questions →</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <sc-for list="{{ dueList }}" as="q" hint-placeholder-count="4">
+                  <div onClick="{{ q.open }}" style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:15px 17px 15px 20px;display:flex;flex-direction:column;gap:9px;cursor:pointer;position:relative;overflow:hidden;transition:border-color .15s,transform .15s" style-hover="border-color:rgba(16,19,24,.25);transform:translateY(-2px)">
+                    <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{{ q.tone }}"></div>
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <span style="font:800 15px Manrope,sans-serif">{{ q.who }}</span>
+                      <span style="padding:3px 8px;border-radius:6px;font:700 11px Manrope,sans-serif;background:{{ q.chipBg }};color:{{ q.chipFg }}">{{ q.chip }}</span>
+                      <span style="padding:3px 8px;border-radius:6px;font:700 11px Manrope,sans-serif;background:#f0f1f4;color:#4b5361">{{ q.cat }}</span>
+                      <span style="margin-left:auto;font:500 11px 'JetBrains Mono',monospace;color:#a7aeb8">{{ q.ref }}</span>
+                    </div>
+                    <div style="font-size:14px;line-height:1.5;color:#4b5361;max-width:560px">{{ q.summary }}</div>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span style="font-size:12px;color:#79828f">{{ q.promise }}</span>
+                      <span style="margin-left:auto;font-size:12.5px;font-weight:700;color:#5b4be8">Answer it →</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:18px">
+
+              <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font:800 14px Manrope,sans-serif">Waiting for your OK</span>
+                  <span style="font-size:12px;color:#79828f">Nobody is told anything until you decide.</span>
+                </div>
+                <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(16,19,24,.09);border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font:800 14px Manrope,sans-serif">Anthony Geller — meeting</span>
+                    <span style="margin-left:auto;padding:3px 8px;border-radius:6px;font:700 11px Manrope,sans-serif;background:#f0f1f4;color:#4b5361">Jewish High</span>
+                  </div>
+                  <div style="font-size:13px;color:#4b5361;line-height:1.5">Sunday 20:15 · 30 min · “Kashrus for the school kitchen”</div>
+                  <div style="display:flex;gap:8px">
+                    <div onClick="{{ approve }}" style="flex:1;padding:10px;border-radius:8px;background:#12795a;color:#fff;text-align:center;font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#0d6247">Yes, book it</div>
+                    <div onClick="{{ decline }}" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(16,19,24,.14);text-align:center;font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#f4f5f7">Can't make it</div>
+                  </div>
+                </div>
+                </sc-if>
+                <sc-if value="{{ pendingCleared }}">
+                <div style="border:1px solid rgba(18,121,90,.25);background:#e6f5ef;border-radius:11px;padding:14px;font-size:13px;line-height:1.5;color:#0d6247">{{ pendingMsg }}</div>
+                </sc-if>
+
+                <sc-if value="{{ invitePending }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(91,75,232,.3);background:#f8f7ff;border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font:800 14px Manrope,sans-serif">Raffi Goldberg — invitation to speak</span>
+                    <span style="margin-left:auto;padding:3px 8px;border-radius:6px;font:700 11px Manrope,sans-serif;background:#ece9ff;color:#4536cc">Sheva brochos</span>
+                  </div>
+                  <div style="font-size:13px;color:#4b5361;line-height:1.5">Sunday 24 August, 21:00 · 20 min · Simcha hall, 14 Cheltenham Cres · about 60 people</div>
+                  <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:9px;background:#fbf2e0">
+                    <span style="font-size:12px;color:#a9700f">▲</span>
+                    <span style="font-size:12.5px;line-height:1.45;color:#8a5c0d">Your chosson lesson is at 20:30 that night. Twenty minutes each way — it's tight.</span>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <div onClick="{{ acceptInvite }}" style="flex:1;padding:10px;border-radius:8px;background:#12795a;color:#fff;text-align:center;font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#0d6247">Yes, I'll come</div>
+                    <div onClick="{{ declineInvite }}" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(16,19,24,.14);text-align:center;font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#fff">Not this time</div>
+                  </div>
+                </div>
+                </sc-if>
+                <sc-if value="{{ inviteCleared }}">
+                <div style="border:1px solid rgba(18,121,90,.25);background:#e6f5ef;border-radius:11px;padding:14px;font-size:13px;line-height:1.5;color:#0d6247">{{ inviteMsg }}</div>
+                </sc-if>
+              </div>
+
+              <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font:800 14px Manrope,sans-serif">Tuesday</span>
+                  <span style="font-size:12px;color:#79828f">Your fixed times, plus anything booked.</span>
+                </div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ day }}" as="d" hint-placeholder-count="5">
+                    <div style="display:flex;gap:13px;padding:10px 0;border-top:1px solid rgba(16,19,24,.07);align-items:flex-start">
+                      <span style="width:42px;flex:none;font:700 12.5px 'JetBrains Mono',monospace;color:#101318;padding-top:1px">{{ d.time }}</span>
+                      <span style="width:9px;height:9px;flex:none;border-radius:99px;margin-top:4px;background:{{ d.dot }}"></span>
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <span style="font-size:13.5px;font-weight:700">{{ d.label }}</span>
+                        <span style="font-size:12px;color:#79828f">{{ d.sub }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isQuestions }}">
+        <div style="display:flex;flex-direction:column;gap:16px;animation:fadeUp .3s ease both">
+          <div style="display:flex;gap:8px;align-items:center">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="3">
+              <div style="padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;background:{{ f.bg }};color:{{ f.fg }};border:1px solid {{ f.bd }}">{{ f.label }}</div>
+            </sc-for>
+            <div style="margin-left:auto;font-size:12.5px;color:#79828f">Newest promises first — the top row is the one to do next.</div>
+          </div>
+
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:190px 1fr 150px 170px 120px;gap:14px;padding:12px 18px;background:#fafbfc;border-bottom:1px solid rgba(16,19,24,.08);font:800 10.5px Manrope,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#79828f">
+              <span>Who asked</span><span>What it's about</span><span>Category</span><span>You promised</span><span>Status</span>
+            </div>
+            <sc-for list="{{ allList }}" as="r" hint-placeholder-count="5">
+              <div onClick="{{ r.open }}" style="display:grid;grid-template-columns:190px 1fr 150px 170px 120px;gap:14px;padding:15px 18px;border-bottom:1px solid rgba(16,19,24,.06);align-items:center;cursor:pointer;transition:background .12s" style-hover="background:#fafbfc">
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                  <span style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.who }}</span>
+                  <span style="font:500 11px 'JetBrains Mono',monospace;color:#a7aeb8">{{ r.ref }} · {{ r.channel }}</span>
+                </div>
+                <span style="font-size:13.5px;color:#4b5361;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.summary }}</span>
+                <span style="font-size:12.5px;color:#4b5361">{{ r.cat }}</span>
+                <span style="font-size:12.5px;color:{{ r.promiseFg }};font-weight:600">{{ r.promise }}</span>
+                <span style="justify-self:start;padding:4px 9px;border-radius:6px;font:700 11.5px Manrope,sans-serif;background:{{ r.chipBg }};color:{{ r.chipFg }}">{{ r.chip }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isDiary }}">
+        <div style="display:flex;flex-direction:column;gap:16px;animation:fadeUp .3s ease both">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:13px;color:#79828f">Grey is your fixed week. Purple is someone who booked you. Drag to block time off.</div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <div style="padding:8px 14px;border-radius:9px;border:1px solid rgba(16,19,24,.14);font-size:13px;font-weight:700;cursor:pointer;background:#fff">This week</div>
+              <div style="padding:8px 14px;border-radius:9px;background:#5b4be8;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Release call times</div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:62px repeat(6,1fr);border-bottom:1px solid rgba(16,19,24,.08)">
+              <div></div>
+              <sc-for list="{{ weekHead }}" as="h" hint-placeholder-count="6">
+                <div style="padding:12px 10px;text-align:center;border-left:1px solid rgba(16,19,24,.06)">
+                  <div style="font:800 12.5px Manrope,sans-serif;color:{{ h.fg }}">{{ h.name }}</div>
+                  <div style="font:500 11px 'JetBrains Mono',monospace;color:#a7aeb8">{{ h.date }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="position:relative;height:456px;display:grid;grid-template-columns:62px repeat(6,1fr)">
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ hours }}" as="t" hint-placeholder-count="12">
+                  <div style="height:38px;padding-right:9px;text-align:right;font:500 10.5px 'JetBrains Mono',monospace;color:#a7aeb8;border-top:1px solid rgba(16,19,24,.05)">{{ t.label }}</div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ weekCols }}" as="c" hint-placeholder-count="6">
+                <div style="position:relative;border-left:1px solid rgba(16,19,24,.06);background:{{ c.bg }}">
+                  <sc-for list="{{ c.events }}" as="e" hint-placeholder-count="2">
+                    <div style="position:absolute;left:5px;right:5px;top:{{ e.top }};height:{{ e.h }};border-radius:8px;padding:7px 9px;background:{{ e.bg }};border-left:3px solid {{ e.edge }};overflow:hidden">
+                      <div style="font-size:11.5px;font-weight:800;color:{{ e.fg }};line-height:1.25">{{ e.label }}</div>
+                      <div style="font:500 10px 'JetBrains Mono',monospace;color:{{ e.subFg }}">{{ e.time }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isRequests }}">
+        <div style="display:flex;flex-direction:column;gap:14px;animation:fadeUp .3s ease both">
+          <div style="font-size:13px;color:#79828f">Anything that wants a slice of your time. Nobody is told anything until you decide — approve or decline on the Today screen.</div>
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:220px 190px 1fr 150px;gap:14px;padding:12px 18px;background:#fafbfc;border-bottom:1px solid rgba(16,19,24,.08);font:800 10.5px Manrope,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:#79828f">
+              <span>Who</span><span>What they want</span><span>When</span><span>Status</span>
+            </div>
+            <sc-for list="{{ reqRows }}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:220px 190px 1fr 150px;gap:14px;padding:15px 18px;border-bottom:1px solid rgba(16,19,24,.06);align-items:center">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <span style="font-size:13.5px;font-weight:700">{{ r.who }}</span>
+                  <span style="font-size:11.5px;color:#a7aeb8">{{ r.sub }}</span>
+                </div>
+                <span style="font-size:13px;font-weight:600;color:#4b5361">{{ r.kind }}</span>
+                <span style="font-size:13px;color:#4b5361">{{ r.detail }}</span>
+                <span style="justify-self:start;padding:4px 10px;border-radius:6px;font:700 11.5px Manrope,sans-serif;background:{{ r.bg }};color:{{ r.fg }}">{{ r.state }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isSettings }}">
+        <div style="display:flex;flex-direction:column;gap:16px;max-width:760px;animation:fadeUp .3s ease both">
+          <div style="font-size:13px;color:#79828f">Everything here saves itself. Nothing you change can lose a question.</div>
+
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:20px;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font:800 15px Manrope,sans-serif">How many questions can you answer in a day?</span>
+              <span style="font-size:12.5px;color:#79828f">This is what decides the “expect an answer by…” each person is promised. Ten means roughly two days' wait when the queue is full.</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <sc-for list="{{ capacity }}" as="c" hint-placeholder-count="4">
+                <div onClick="{{ c.pick }}" style="flex:1;padding:14px;border-radius:10px;text-align:center;font:800 16px Manrope,sans-serif;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.bd }}">{{ c.n }}</div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:6px 20px">
+            <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid rgba(16,19,24,.06)">
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:14px;font-weight:700">{{ t.label }}</span>
+                  <span style="font-size:12.5px;color:#79828f;line-height:1.45">{{ t.hint }}</span>
+                </div>
+                <div onClick="{{ t.flip }}" style="width:52px;height:30px;border-radius:99px;flex:none;position:relative;cursor:pointer;background:{{ t.trackBg }};transition:background .18s">
+                  <span style="position:absolute;top:3px;left:{{ t.knobX }};width:24px;height:24px;border-radius:99px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .18s"></span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:#fff;border:1px solid rgba(16,19,24,.09);border-radius:13px;padding:20px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font:800 15px Manrope,sans-serif">Who can see private questions</span>
+              <span style="font-size:12.5px;color:#79828f">Niddah and shalom bayis are hidden from everyone but you — in lists, in texts, and in the database itself.</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div style="padding:9px 14px;border-radius:9px;background:#12141a;color:#fff;font-size:13px;font-weight:700">Rabbi Y. Emanuel · you</div>
+              <div style="padding:9px 14px;border-radius:9px;background:#f4f5f7;border:1px solid rgba(16,19,24,.09);font-size:13px;color:#4b5361">Rebbetzin (assistant) · never</div>
+              <div style="padding:9px 14px;border-radius:9px;border:1px dashed rgba(16,19,24,.2);font-size:13px;color:#79828f;cursor:pointer">+ Add a helper</div>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+
+    <sc-if value="{{ drawerOpen }}">
+      <div onClick="{{ closeDrawer }}" style="position:absolute;inset:0;background:rgba(11,13,18,.42);z-index:20"></div>
+      <div style="position:absolute;top:0;right:0;bottom:0;width:560px;background:#fff;z-index:21;display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(11,13,18,.22);animation:slideIn .26s cubic-bezier(.22,.8,.3,1) both">
+        <div style="padding:20px 24px;border-bottom:1px solid rgba(16,19,24,.09);display:flex;align-items:flex-start;gap:12px">
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="font:800 18px Manrope,sans-serif">{{ sel.who }}</span>
+              <span style="padding:3px 8px;border-radius:6px;font:700 11px Manrope,sans-serif;background:{{ sel.chipBg }};color:{{ sel.chipFg }}">{{ sel.chip }}</span>
+            </div>
+            <div style="font:500 11.5px 'JetBrains Mono',monospace;color:#a7aeb8">{{ sel.ref }} · {{ sel.cat }} · {{ sel.channel }} · {{ sel.aff }}</div>
+          </div>
+          <div onClick="{{ closeDrawer }}" style="width:32px;height:32px;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:#79828f;font-size:16px" style-hover="background:#f4f5f7">✕</div>
+        </div>
+
+        <div style="flex:1;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:18px">
+          <div style="background:#f4f5f7;border-radius:12px;padding:17px 18px;display:flex;flex-direction:column;gap:8px">
+            <span style="font:800 10.5px Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#79828f">What they asked</span>
+            <span style="font-size:15px;line-height:1.65;color:#101318;text-wrap:pretty">{{ sel.question }}</span>
+          </div>
+
+          <div style="border:1px solid rgba(91,75,232,.28);background:#f4f2ff;border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start">
+            <span style="font-size:14px;color:#5b4be8">◈</span>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:13px;line-height:1.5;color:#3a3170"><b>Sorted as {{ sel.cat }}, {{ sel.tier }}.</b> {{ sel.aiWhy }}</span>
+              <span style="font-size:12.5px;font-weight:700;color:#5b4be8;cursor:pointer">Change how it's sorted</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font:800 10.5px Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#79828f">You've answered this before</span>
+            <div style="border:1px solid rgba(16,19,24,.09);border-radius:11px;padding:13px 15px;display:flex;flex-direction:column;gap:5px;cursor:pointer" style-hover="background:#fafbfc">
+              <span style="font-size:13.5px;font-weight:700">{{ sel.past }}</span>
+              <span style="font-size:12.5px;color:#79828f">Answered 3 days ago · tap to reuse the wording</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <span style="font:800 10.5px Manrope,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#79828f">Your answer</span>
+            <textarea value="{{ draft }}" onChange="{{ onDraft }}" placeholder="Type it, or press Say it and we'll write it out for you…" style="width:100%;min-height:150px;resize:none;border:1px solid rgba(16,19,24,.14);border-radius:12px;padding:15px;font:400 15px/1.6 Manrope,sans-serif;color:#101318;outline:none;background:#fff"></textarea>
+            <div style="display:flex;gap:8px">
+              <div onClick="{{ dictate }}" style="padding:9px 14px;border-radius:9px;border:1px solid rgba(16,19,24,.14);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px" style-hover="background:#f4f5f7">🎙 Say it instead</div>
+              <div style="padding:9px 14px;border-radius:9px;border:1px solid rgba(16,19,24,.14);font-size:13px;font-weight:700;cursor:pointer" style-hover="background:#f4f5f7">Ask them for more detail</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:16px 24px 20px;border-top:1px solid rgba(16,19,24,.09);display:flex;flex-direction:column;gap:10px;background:#fff">
+          <div style="font-size:12.5px;color:#79828f">{{ sendHint }}</div>
+          <div style="display:flex;gap:9px">
+            <div onClick="{{ send }}" style="flex:1;padding:14px;border-radius:10px;background:{{ sendBg }};color:#fff;text-align:center;font-size:14.5px;font-weight:800;cursor:pointer">Send the answer</div>
+            <div style="padding:14px 18px;border-radius:10px;border:1px solid rgba(16,19,24,.14);font-size:14.5px;font-weight:700;cursor:pointer" style-hover="background:#f4f5f7">Ring them</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasToast }}">
+      <div style="position:absolute;bottom:26px;left:50%;z-index:40;padding:13px 20px;border-radius:11px;background:#12141a;color:#fff;font-size:13.5px;font-weight:600;box-shadow:0 12px 30px rgba(11,13,18,.3);animation:toastIn .25s ease both;display:flex;align-items:center;gap:10px">
+        <span style="width:7px;height:7px;border-radius:99px;background:#3fbb84"></span>{{ toast }}
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMember }}">
+<div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+  <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;align-self:flex-start;max-width:100%">
+    <div style="font:800 14px Manrope,sans-serif">The kehillah's app</div>
+    <div style="font-size:12.5px;color:#79828f">Every screen, in the order someone meets them — including the whole thing worked over text message.</div>
+  </div>
+  <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+    <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+      <div style="display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;padding-top:6px">
+        <span style="font:800 11px Manrope,sans-serif;letter-spacing:.11em;text-transform:uppercase;color:#5b4be8">{{ g.step }}</span>
+        <span style="font:800 16px Manrope,sans-serif">{{ g.title }}</span>
+        <span style="font-size:12.5px;color:#79828f">{{ g.blurb }}</span>
+      </div>
+      <div style="display:flex;gap:26px;flex-wrap:wrap">
+        <sc-for list="{{ g.phones }}" as="p" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:9px;align-items:center">
+            <div style="width:378px;height:800px;border-radius:44px;background:#12141a;padding:9px;box-shadow:0 20px 50px rgba(11,13,18,.2)">
+              <div style="width:100%;height:100%;border-radius:36px;background:#f4f5f7;overflow:hidden;display:flex;flex-direction:column;position:relative">
+                <div style="padding:15px 26px 4px;display:flex;justify-content:space-between;font:700 12.5px 'JetBrains Mono',monospace;color:{{ p.statusFg }};flex:none"><span>9:41</span><span>▮▮ ▲ ▮</span></div>
+                <dc-import name="MemberScreen" is-welcome="{{ p.isWelcome }}" is-code="{{ p.isCode }}" is-signup="{{ p.isSignup }}" is-home="{{ p.isHome }}" is-ask="{{ p.isAsk }}" is-invite="{{ p.isInvite }}" is-answer="{{ p.isAnswer }}" is-sms-ask="{{ p.isSmsAsk }}" is-sms-answer="{{ p.isSmsAnswer }}" is-sms-private="{{ p.isSmsPrivate }}" is-sms-invite="{{ p.isSmsInvite }}" is-sms-handoff="{{ p.isSmsHandoff }}" is-sms-notify="{{ p.isSmsNotify }}" hint-size="100%,100%"></dc-import>
+              </div>
+            </div>
+            <div style="font-size:12.5px;color:#79828f;font-weight:600;max-width:378px;text-align:center">{{ p.caption }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1000}}">
+const SH = [
+  { id:'s1', ref:'S-0042', who:'Private matter', realWho:'Mrs Geller', cat:'Niddah', tier:'urgent — today',
+    channel:'in the app', aff:'Shul member', due:'today', chip:'Due today', tone:'#c93b2b',
+    summary:'A private matter — details open only for you.',
+    question:'The full text of a taharas hamishpacha question. It is masked in every list, left out of every text message, and invisible to a helper account at the database level.',
+    aiWhy:'Private categories are always same-day and never summarised.', past:'A similar question — Adar', promise:'You promised: by this evening' },
+  { id:'s2', ref:'S-0041', who:'Raffi Goldberg', realWho:'Raffi Goldberg', cat:'Kashrus', tier:'urgent — today',
+    channel:'in the app', aff:'Shul member', due:'today', chip:'Due today', tone:'#c93b2b',
+    summary:'Meat spoon used to stir a boiling milchig soup.',
+    question:'I was cooking milchig soup and stirred it with a clean meat spoon by mistake — the soup was boiling at the time. What do I do with the soup, and with the spoon?',
+    aiWhy:'He said he needs it today; the soup is on the stove.', past:'Fleishig pot soaked in the milchig sink', promise:'You promised: by this evening' },
+  { id:'s3', ref:'S-0040', who:'Shlomie Graff', realWho:'Shlomie Graff', cat:'Shabbos', tier:'soon — 2 days',
+    channel:'texted in', aff:'Shul member · by text', due:'tomorrow', chip:'Due tomorrow', tone:'#a9700f',
+    summary:'Asking a non-Jewish carer to put the heating on for his mother on Shabbos.',
+    question:'Texted in: can I ask the non-Jewish carer to switch the heating on for my mother on Shabbos?',
+    aiWhy:'He has no smartphone — your answer goes back to him as a text.', past:'Carer warming food on Shabbos', promise:'You promised: by tomorrow evening' },
+  { id:'s4', ref:'S-0039', who:'Anthony Geller', realWho:'Anthony Geller', cat:'Kashrus', tier:'no rush',
+    channel:'in the app', aff:'Jewish High', due:'thursday', chip:'Thursday', tone:'#79828f',
+    summary:'Toveling a new urn bought for the school kitchen.',
+    question:'We have bought a large urn for the Jewish High kitchen. It was made abroad and assembled here. Does it need tevilah, and with a brocha or without?',
+    aiWhy:'Nothing time-critical in how he wrote it.', past:'Toveling a new mixer', promise:'You promised: by Thursday evening' },
+];
+
+const DAY = [
+  { time:'07:00', label:'Shacharis', sub:'Every weekday', dot:'#c2c8d0' },
+  { time:'09:00', label:'Beis Hatalmud', sub:'Until 13:00 — nothing can be booked', dot:'#c2c8d0' },
+  { time:'14:30', label:'Answering questions', sub:'Held open for you — 90 min', dot:'#5b4be8' },
+  { time:'17:00', label:'Phone call — Shlomie Graff', sub:'10 min · following up his Shabbos shailah', dot:'#5b4be8' },
+  { time:'20:30', label:'Chosson lesson', sub:'Weekly', dot:'#c2c8d0' },
+];
+
+class Component extends DCLogic {
+  state = { view:'console', tab:'today', openId:null, draft:'', answered:[], booking:'pending',
+            invite:'pending', toast:null, cap:10, tog:{ calls:true, meets:false, brief:true, sms:true } };
+
+  toast(msg){ clearTimeout(this._tt); this.setState({ toast: msg }); this._tt = setTimeout(()=>this.setState({toast:null}), 3200); }
+  componentWillUnmount(){ clearTimeout(this._tt); }
+
+  chip(s){
+    if (this.state.answered.includes(s.id)) return { chip:'Answered', chipBg:'#e6f5ef', chipFg:'#12795a' };
+    if (s.due === 'today') return { chip:'Due today', chipBg:'#fdeeec', chipFg:'#c93b2b' };
+    if (s.due === 'tomorrow') return { chip:'Due tomorrow', chipBg:'#fbf2e0', chipFg:'#a9700f' };
+    return { chip:'Thursday', chipBg:'#f0f1f4', chipFg:'#4b5361' };
+  }
+
+  renderVals(){
+    const st = this.state;
+    const openShailos = SH.filter(s => !st.answered.includes(s.id));
+    const dueCount = openShailos.filter(s => s.due === 'today').length;
+    const sel = SH.find(s => s.id === st.openId) || null;
+
+    const mkRow = (s) => ({ ...s, ...this.chip(s), tone: st.answered.includes(s.id) ? '#12795a' : s.tone,
+      open: () => this.setState({ openId: s.id, draft: '' }) });
+
+    const navItem = (key, label, icon, badge) => ({
+      label, icon, badge: badge == null ? '' : String(badge),
+      bg: st.tab === key ? 'rgba(255,255,255,.1)' : 'transparent',
+      fg: st.tab === key ? '#ffffff' : 'rgba(255,255,255,.62)',
+      badgeBg: badge ? (st.tab === key ? '#5b4be8' : 'rgba(255,255,255,.1)') : 'transparent',
+      badgeFg: badge ? '#ffffff' : 'transparent',
+      go: () => this.setState({ tab: key, openId: null }),
+    });
+
+    const titles = {
+      today: ['Today', 'What needs you, in the order you promised it.'],
+      questions: ['Questions', 'Every shailah, open and answered.'],
+      diary: ['Diary', 'Your week, and the times people can book.'],
+      requests: ['Requests', 'Calls, meetings and invitations to speak.'],
+      settings: ['Settings', 'Plain switches. Everything saves itself.'],
+    }[st.tab];
+
+    const flt = (label, on) => ({ label,
+      bg: on ? '#12141a' : '#fff', fg: on ? '#fff' : '#4b5361',
+      bd: on ? '#12141a' : 'rgba(16,19,24,.12)' });
+
+    const tog = (key, label, hint) => ({ label, hint,
+      trackBg: st.tog[key] ? '#12795a' : '#d6d9de',
+      knobX: st.tog[key] ? '25px' : '3px',
+      flip: () => this.setState(s => ({ tog: { ...s.tog, [key]: !s.tog[key] } })) });
+
+    const ev = (label, time, top, h, kind) => ({ label, time, top, h,
+      bg: kind === 'booked' ? '#efecff' : '#f2f3f5',
+      edge: kind === 'booked' ? '#5b4be8' : '#c2c8d0',
+      fg: kind === 'booked' ? '#3a3170' : '#4b5361',
+      subFg: kind === 'booked' ? '#6f63c4' : '#a7aeb8' });
+
+    const fixed = [ev('Shacharis','07:00',0,'38px','fixed'), ev('Beis Hatalmud','09:00–13:00','76px','152px','fixed')];
+
+    return {
+      views: ['console','member'].map(v => ({
+        label: { console:'Rov console', member:'Kehillah app' }[v],
+        bg: st.view === v ? '#12141a' : 'transparent',
+        fg: st.view === v ? '#fff' : '#4b5361',
+        go: () => this.setState({ view: v }) })),
+      isConsole: st.view === 'console', isMember: st.view === 'member',
+      isToday: st.tab === 'today', isQuestions: st.tab === 'questions',
+      isDiary: st.tab === 'diary', isSettings: st.tab === 'settings', isRequests: st.tab === 'requests',
+      reqRows: [
+        { who:'Raffi Goldberg', sub:'Shul member', kind:'Invitation to speak', detail:'Sheva brochos · Sun 24 Aug 21:00 · 20 min · Simcha hall',
+          state: st.invite === 'pending' ? 'Waiting on you' : (st.invite === 'accepted' ? 'Accepted' : 'Declined'),
+          bg: st.invite === 'pending' ? '#fbf2e0' : (st.invite === 'accepted' ? '#e6f5ef' : '#f0f1f4'),
+          fg: st.invite === 'pending' ? '#a9700f' : (st.invite === 'accepted' ? '#12795a' : '#4b5361') },
+        { who:'Anthony Geller', sub:'Jewish High', kind:'Meeting', detail:'Sun 20:15 · 30 min · kashrus for the school kitchen',
+          state: st.booking === 'pending' ? 'Waiting on you' : (st.booking === 'approved' ? 'Booked' : 'Declined'),
+          bg: st.booking === 'pending' ? '#fbf2e0' : (st.booking === 'approved' ? '#e6f5ef' : '#f0f1f4'),
+          fg: st.booking === 'pending' ? '#a9700f' : (st.booking === 'approved' ? '#12795a' : '#4b5361') },
+        { who:'Shlomie Graff', sub:'Shul member · by text', kind:'Phone call', detail:'Today 17:00 · 10 min · booked over SMS',
+          state:'Confirmed', bg:'#e6f5ef', fg:'#12795a' },
+        { who:'Mrs Geller', sub:'Shul member', kind:'Phone call', detail:'Sun 19:15 · 10 min · booked in the app',
+          state:'Confirmed', bg:'#e6f5ef', fg:'#12795a' },
+      ],
+      pageTitle: titles[0], pageSub: titles[1],
+
+      nav: [ navItem('today','Today','◐',null), navItem('questions','Questions','✦', openShailos.length),
+             navItem('diary','Diary','▤',null), navItem('requests','Requests','✧',
+               (st.booking === 'pending' ? 1 : 0) + (st.invite === 'pending' ? 1 : 0)),
+             navItem('settings','Settings','⚙',null) ],
+
+      signals: [
+        { label:'Answer today', n:String(dueCount), unit: dueCount === 1 ? 'question' : 'questions',
+          dot:'#c93b2b', numFg: dueCount ? '#c93b2b' : '#101318',
+          hint: dueCount ? 'These people were promised an answer before tonight.' : 'Nothing is owed today.' },
+        { label:'In the diary', n:'1', unit:'phone call', dot:'#5b4be8', numFg:'#101318',
+          hint:'Shlomie Graff, 17:00. He gets a reminder text an hour before.' },
+        (() => {
+          const mp = st.booking === 'pending', ip = st.invite === 'pending';
+          const n = (mp ? 1 : 0) + (ip ? 1 : 0);
+          return { label:'Waiting for your OK', n:String(n), unit: n === 1 ? 'request' : 'requests',
+            dot:'#a9700f', numFg:'#101318',
+            hint: mp && ip ? "A meeting and a speaking invitation. Neither person has been told anything yet."
+              : mp ? "Anthony Geller's meeting. He hasn't been told anything yet."
+              : ip ? "Raffi Goldberg's invitation to speak. He hasn't been told anything yet."
+              : 'Nothing waiting — everyone has had their answer.' };
+        })(),
+      ],
+
+      briefing: "Boker tov, Rebbe.\nShacharis 7:00, Beis Hatalmud until 13:00, chosson lesson 20:30.\nTwo questions are promised for today — Raffi Goldberg's kashrus shailah and one private matter. Nothing is overdue.\nAnthony Geller wants a meeting, Raffi Goldberg has invited you to speak at a sheva brochos, and Shlomie Graff's text question is due tomorrow.",
+
+      dueList: openShailos.map(mkRow),
+      allList: SH.map(mkRow).map(r => ({ ...r, promiseFg: r.due === 'today' ? '#c93b2b' : '#4b5361' })),
+      goQuestions: () => this.setState({ tab:'questions' }),
+
+      hasPending: st.booking === 'pending',
+      pendingCleared: st.booking !== 'pending',
+      pendingMsg: st.booking === 'approved'
+        ? "Booked for Sunday 20:15. Anthony has been texted, and it's in your diary."
+        : "Declined. Anthony was texted and invited to pick another time.",
+      approve: () => { this.setState({ booking:'approved' }); this.toast('Anthony Geller has been texted — Sunday 20:15 is in your diary.'); },
+      decline: () => { this.setState({ booking:'declined' }); this.toast("Anthony has been told, and asked to choose another time."); },
+
+      invitePending: st.invite === 'pending',
+      inviteCleared: st.invite !== 'pending',
+      inviteMsg: st.invite === 'accepted'
+        ? "Accepted. Raffi has been texted, and Sunday 24 August 21:00 is in your diary."
+        : "Declined. Raffi was texted — he can suggest another date.",
+      acceptInvite: () => { this.setState({ invite:'accepted' }); this.toast('Raffi Goldberg has been texted — the sheva brochos is in your diary.'); },
+      declineInvite: () => { this.setState({ invite:'declined' }); this.toast('Raffi has been told you cannot make it.'); },
+
+      day: DAY,
+
+      filters: [flt('Open (' + openShailos.length + ')', true), flt('Answered', false), flt('Private only', false), flt('Texted in', false)],
+
+      weekHead: ['Sun','Mon','Tue','Wed','Thu','Fri'].map((name, i) => ({
+        name, date: String(10 + i), fg: i === 2 ? '#5b4be8' : '#101318' })),
+      hours: ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'].map(l => ({ label: l })),
+      weekCols: [
+        { bg:'#fff', events:[ev('Shacharis','08:00','38px','38px','fixed'), ev('Calls released','19:00 ×6','380px','38px','booked')] },
+        { bg:'#fff', events: fixed },
+        { bg:'#fbfbfd', events:[...fixed, ev('Answering time','14:30','285px','57px','booked'), ev('Shlomie Graff','17:00 call','380px','38px','booked')] },
+        { bg:'#fff', events: fixed },
+        { bg:'#fff', events:[...fixed, ev('Meetings','20:00–21:30','418px','38px','booked')] },
+        { bg:'#fff', events:[ev('Shacharis','07:00',0,'38px','fixed'), ev('Family time','17:00','380px','76px','fixed')] },
+      ],
+
+      capacity: [5,10,15,20].map(n => ({ n:String(n),
+        bg: st.cap === n ? '#12141a' : '#f4f5f7', fg: st.cap === n ? '#fff' : '#4b5361',
+        bd: st.cap === n ? '#12141a' : 'rgba(16,19,24,.09)',
+        pick: () => { this.setState({ cap:n }); this.toast('Saved — new questions will be promised on ' + n + ' a day.'); } })),
+      toggles: [
+        tog('calls','Phone calls book themselves','Someone picks a time you released and it is simply booked. Turn off to approve each one.'),
+        tog('meets','Meetings book themselves','Most Rabbonim leave this off so nothing lands in the diary without them.'),
+        tog('brief','Morning briefing','A short text at 06:40 with your day and anything overdue.'),
+        tog('sms','Texts to the kehillah',"Booking confirmations, reminders, and 'your answer is ready'."),
+      ],
+
+      drawerOpen: !!sel,
+      sel: sel ? { ...sel, ...this.chip(sel) } : {},
+      draft: st.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      dictate: () => this.setState({ draft: 'The soup is fine to eat. Put the spoon aside and bring it to me after Maariv.' }),
+      sendHint: st.draft.trim().length > 1
+        ? 'They get a text straight away: “Your answer is ready.” Nothing else is sent.'
+        : 'Write something first, or ring them instead.',
+      sendBg: st.draft.trim().length > 1 ? '#12141a' : '#c2c8d0',
+      send: () => {
+        if (st.draft.trim().length < 2 || !sel) return;
+        this.setState(s => ({ answered:[...s.answered, sel.id], openId:null, draft:'' }));
+        this.toast('Sent to ' + sel.realWho + ' — she has been texted that it is ready.');
+      },
+      closeDrawer: () => this.setState({ openId:null }),
+      hasToast: !!st.toast, toast: st.toast,
+
+      groups: [
+        { step:'Step one', title:'Getting in', blurb:'A texted code, no password. Sign-up asks only what the Rov needs to know.',
+          keys:[['welcome','First open — sign in with a texted code'],
+                ['code','The code — good for ten minutes'],
+                ['signup','New here — pick “A Moisod or organisation” and it asks which one']] },
+        { step:'Step two', title:'What the kehillah can do', blurb:'Four things, all on one screen: ask, call, meet, or invite him to speak.',
+          keys:[['home','Home — Raffi Goldberg, one question already in'],
+                ['ask','A kashrus shailah — the promise shown before he sends'],
+                ['invite','Inviting the Rov to a simcha — occasion, date, time, length'],
+                ['answer','The answer, about six hours later']] },
+        { step:'Step three', title:'No smartphone? Just text', blurb:'The same queue, worked entirely over SMS. It sorts the shailah itself and only asks what the Rov would have asked — it never answers halacha.',
+          keys:[['smsAsk','Shlomie Graff texts in — recognised, chased for the one detail the Rov will want, then promised a time'],
+                ['smsAnswer','The Rov\'s answer arrives, and a call is booked in plain words'],
+                ['smsPrivate','A private shailah by text — the content never travels back over SMS'],
+                ['smsInvite','An invitation to speak, taken and answered entirely by text'],
+                ['smsHandoff',"When it can't follow, it stops and puts a person on it — never two guesses in a row"],
+                ['smsNotify','What the app sends unprompted — and what it deliberately won\'t send on Shabbos']] },
+      ].map(g => ({ ...g, phones: g.keys.map(([k, caption]) => ({ caption,
+        statusFg: k === 'welcome' ? 'rgba(255,255,255,.85)' : '#101318',
+        isWelcome: k === 'welcome', isCode: k === 'code', isSignup: k === 'signup',
+        isHome: k === 'home', isAsk: k === 'ask', isInvite: k === 'invite', isAnswer: k === 'answer',
+        isSmsAsk: k === 'smsAsk', isSmsAnswer: k === 'smsAnswer', isSmsPrivate: k === 'smsPrivate',
+        isSmsInvite: k === 'smsInvite', isSmsHandoff: k === 'smsHandoff', isSmsNotify: k === 'smsNotify' })) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

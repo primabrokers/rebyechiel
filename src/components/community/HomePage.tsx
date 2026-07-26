@@ -1,133 +1,186 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, MessageCircleQuestion, Phone, Users, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
-import { demoBookings, demoMyShailos, isDemo } from '../../lib/demo';
+import { demoBookings, demoInvitations, demoMyShailos, isDemo } from '../../lib/demo';
 import { useAuth } from '../../lib/auth';
-import { AFFILIATION_LABELS, type Booking, type Shailah } from '../../types';
-import { Display, Pill, SectionLabel } from '../shared/ui';
+import { OCCASION_LABELS, type Booking, type Invitation, type Shailah } from '../../types';
+import { Eyebrow } from '../shared/ui';
+import { Phone } from '../shared/ui';
 import { fmtSlot } from '../../lib/format';
 
+/**
+ * The kehillah's home screen. Four things you can ask of the Rov, the first one weighted because
+ * it is what most people come for, then where each of your own requests stands — with the promise
+ * shown as a bar that fills, so "due today" is felt rather than read.
+ */
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-const STATUS_PILL: Record<string, { tone: 'ok' | 'warn' | 'bad' | 'info'; label: string }> = {
-  new: { tone: 'warn', label: 'With the Rov' },
-  triaged: { tone: 'warn', label: 'With the Rov' },
-  in_progress: { tone: 'warn', label: 'Being looked at' },
-  answered: { tone: 'ok', label: 'Answered' },
-  closed: { tone: 'info', label: 'Closed' },
-  withdrawn: { tone: 'info', label: 'Withdrawn' },
-  requested: { tone: 'warn', label: 'Awaiting the Rov' },
-  confirmed: { tone: 'ok', label: 'Confirmed' },
-  declined: { tone: 'bad', label: 'Not possible' },
-  cancelled: { tone: 'info', label: 'Cancelled' },
-  completed: { tone: 'info', label: 'Done' },
-  rescheduled: { tone: 'warn', label: 'Rescheduled' },
-};
+/** How far through the promised wait we are — full and red means the Rov owes it today. */
+function progress(createdAt: string, dueAt: string | null): number {
+  if (!dueAt) return 0;
+  const start = Date.parse(createdAt);
+  const end = Date.parse(dueAt);
+  if (!(end > start)) return 1;
+  return Math.min(1, Math.max(0.06, (Date.now() - start) / (end - start)));
+}
+
+function ActionCard({ to, icon, title, sub, tone }: {
+  to: string; icon: string; title: string; sub: string; tone: 'indigo' | 'plain' | 'dark';
+}) {
+  return (
+    <Link to={to} className={
+      'rounded-xl p-4 flex items-center gap-3.5 transition-transform active:scale-[.99] ' +
+      (tone === 'indigo' ? 'bg-indigo' : tone === 'dark' ? 'bg-surface border-[1.5px] border-graphite' : 'bg-surface border')
+    }>
+      <div className={'w-[42px] h-[42px] rounded-md grid place-items-center text-[17px] flex-none ' +
+        (tone === 'indigo' ? 'bg-white/[.18] text-white' : tone === 'dark' ? 'bg-graphite text-white' : 'bg-chip')}>
+        {icon}
+      </div>
+      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className={'text-[15.5px] font-extrabold ' + (tone === 'indigo' ? 'text-white' : '')}>{title}</span>
+        <span className={'text-[12px] ' + (tone === 'indigo' ? 'text-white/75' : 'text-ink-muted')}>{sub}</span>
+      </div>
+      <span className={'text-[17px] flex-none ' + (tone === 'indigo' ? 'text-white/80' : tone === 'dark' ? 'text-ink' : 'text-ink-ghost')}>›</span>
+    </Link>
+  );
+}
 
 export function HomePage() {
   const { profile, signOut } = useAuth();
   const [shailos, setShailos] = useState<Shailah[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
 
   useEffect(() => {
     if (!profile) return;
     if (isDemo()) {
       setShailos(demoMyShailos);
       setBookings(demoBookings.filter((b) => b.profile_id === profile.id && Date.parse(b.starts_at) > Date.now()));
+      setInvitations(demoInvitations.filter((i) => i.profile_id === profile.id));
       return;
     }
-    // RLS scopes both queries to the caller's own rows.
+    // RLS scopes all three queries to the caller's own rows.
     supabase.from('rabbi_shailos').select('*').order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => setShailos((data as Shailah[]) ?? []));
     supabase.from('rabbi_bookings').select('*').in('status', ['requested', 'confirmed'])
       .gte('starts_at', new Date().toISOString()).order('starts_at').limit(5)
       .then(({ data }) => setBookings((data as Booking[]) ?? []));
+    supabase.from('rabbi_invitations').select('*').in('status', ['requested', 'accepted'])
+      .gte('starts_at', new Date().toISOString()).order('starts_at').limit(5)
+      .then(({ data }) => setInvitations((data as Invitation[]) ?? []));
   }, [profile]);
 
-  const open = shailos.filter((s) => !['closed', 'withdrawn'].includes(s.status));
+  // Still waiting on him, versus ready to read — an answered question belongs in one list only.
+  const open = shailos.filter((s) => ['new', 'triaged', 'in_progress'].includes(s.status));
+  const answered = shailos.filter((s) => s.status === 'answered');
+  const anything = open.length + answered.length + bookings.length + invitations.length > 0;
 
   return (
-    <div className="min-h-screen max-w-md mx-auto px-5 pt-8 pb-12 flex flex-col gap-3.5">
-      <div className="px-1.5 flex items-start justify-between">
-        <div>
-          <div className="text-[12.5px] font-bold tracking-[0.1em] uppercase text-brass-500">
+    <Phone>
+      <div className="flex-none bg-graphite rounded-b-[26px] px-5 pt-5 pb-6 flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-indigo-light">
             {format(new Date(), 'EEEE d MMMM')}
           </div>
-          <Display className="text-[30px] mt-1">{greeting()},<br />{profile?.full_name?.split(' ')[0]}</Display>
-          {profile?.affiliation && (
-            <p className="text-[13px] text-ink-muted mt-1.5">{AFFILIATION_LABELS[profile.affiliation]}</p>
-          )}
+          <div className="mt-1.5 text-[25px] font-extrabold leading-[1.2] text-white">
+            {greeting()},<br />{profile?.full_name?.split(' ')[0] ?? 'and welcome'}
+          </div>
         </div>
-        <button onClick={signOut} className="p-2.5 text-ink-faint" aria-label="Sign out"><LogOut size={19} /></button>
+        <button onClick={signOut} className="text-[11.5px] font-bold text-white/40 hover:text-white/70 flex-none pt-1">
+          Sign out
+        </button>
       </div>
 
-      <Link to="/ask" className="masthead text-white rounded-2xl shadow-raised p-5 flex items-center gap-4">
-        <div className="w-[54px] h-[54px] rounded-xl bg-white/15 flex items-center justify-center flex-none">
-          <MessageCircleQuestion size={26} />
-        </div>
-        <div className="flex-1">
-          <div className="font-extrabold text-[17.5px] tracking-tight">Ask a shailah</div>
-          <div className="text-[13px] opacity-75">Private — only the Rov sees it</div>
-        </div>
-        <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center flex-none"><ChevronRight size={20} /></div>
-      </Link>
+      <div className="p-3.5 flex flex-col gap-2.5">
+        <ActionCard to="/ask" tone="indigo" icon="✦" title="Ask a shailah" sub="Only the Rov reads it" />
+        {/* U+FE0E keeps ☎ as a glyph rather than a colour emoji, which would break the palette. */}
+        <ActionCard to="/book/call" tone="plain" icon="☎︎" title="Book a phone call" sub="He rings you, at a time he has opened" />
+        <ActionCard to="/book/meeting" tone="plain" icon="◍" title="Ask to meet" sub="Face to face · he confirms himself" />
+        <ActionCard to="/invite" tone="dark" icon="✧" title="Invite the Rov to speak" sub="Simcha, shiur, organisation event" />
 
-      <Link to="/book/call" className="bg-surface rounded-2xl shadow-card p-5 flex items-center gap-4">
-        <div className="w-[54px] h-[54px] rounded-xl bg-royal-100 text-royal-600 flex items-center justify-center flex-none">
-          <Phone size={24} />
-        </div>
-        <div className="flex-1">
-          <div className="font-extrabold text-[17.5px] tracking-tight">Book a phone call</div>
-          <div className="text-[13px] text-ink-muted">From times the Rov has set aside</div>
-        </div>
-        <div className="w-9 h-9 rounded-full bg-paper text-ink-soft flex items-center justify-center flex-none"><ChevronRight size={20} /></div>
-      </Link>
+        {anything && (
+          <>
+            <div className="flex items-baseline justify-between px-1 pt-2">
+              <Eyebrow>Where things stand</Eyebrow>
+              <Link to="/requests" className="text-[12px] font-bold text-indigo">All</Link>
+            </div>
 
-      <Link to="/book/meeting" className="bg-surface rounded-2xl shadow-card p-5 flex items-center gap-4">
-        <div className="w-[54px] h-[54px] rounded-xl bg-royal-100 text-royal-600 flex items-center justify-center flex-none">
-          <Users size={24} />
-        </div>
-        <div className="flex-1">
-          <div className="font-extrabold text-[17.5px] tracking-tight">Request a meeting</div>
-          <div className="text-[13px] text-ink-muted">Face to face with the Rov</div>
-        </div>
-        <div className="w-9 h-9 rounded-full bg-paper text-ink-soft flex items-center justify-center flex-none"><ChevronRight size={20} /></div>
-      </Link>
+            {open.map((s) => {
+              const p = progress(s.created_at, s.due_at);
+              const late = p >= 1 || (s.due_at ? Date.parse(s.due_at) < Date.now() : false);
+              const today = s.due_at ? new Date(s.due_at).toDateString() === new Date().toDateString() : false;
+              return (
+                <Link key={s.id} to={`/requests/${s.id}`} className="bg-surface border rounded-lg p-3.5 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13.5px] font-extrabold truncate">Your question {s.ref}</span>
+                    <span className={'ml-auto flex-none rounded-chip px-2 py-[3px] text-[10.5px] font-bold ' +
+                      (late || today ? 'bg-late-bg text-late' : 'bg-chip text-ink-soft')}>
+                      {late ? 'Overdue' : today ? 'Due today' : 'With the Rov'}
+                    </span>
+                  </div>
+                  <div className="h-[5px] rounded-pill bg-chip overflow-hidden">
+                    <div className={'h-full rounded-pill ' + (late || today ? 'bg-late' : 'bg-indigo')}
+                      style={{ width: `${Math.round(p * 100)}%` }} />
+                  </div>
+                  <div className="text-[12px] leading-snug text-ink-soft">
+                    {s.expected_reply_text
+                      ? <>Answer expected <b>{s.expected_reply_text.replace('The Rov expects to answer ', '').replace(/\.$/, '')}</b>. We'll text you the moment it's ready.</>
+                      : "The Rov has it. We'll text you the moment it's ready."}
+                  </div>
+                </Link>
+              );
+            })}
 
-      {(open.length > 0 || bookings.length > 0) && (
-        <>
-          <SectionLabel action={<Link to="/requests" className="text-[12.5px] font-bold text-royal-600">All →</Link>}>
-            My requests
-          </SectionLabel>
-          {bookings.map((b) => (
-            <Link key={b.id} to={`/requests`} className="bg-surface rounded-xl shadow-card p-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-extrabold text-[15.5px] tracking-tight">
-                  {b.slot_type === 'call' ? 'Phone call' : 'Meeting'} · {fmtSlot(b.starts_at)}
+            {answered.map((s) => (
+              <Link key={s.id} to={`/requests/${s.id}`} className="bg-surface border rounded-lg p-3.5 flex items-center gap-2.5">
+                <span className="w-[9px] h-[9px] rounded-pill bg-good flex-none" />
+                <span className="text-[13.5px] font-extrabold">The Rov has answered {s.ref}</span>
+                <span className="ml-auto text-[15px] text-ink-ghost flex-none">›</span>
+              </Link>
+            ))}
+
+            {bookings.map((b) => (
+              <Link key={b.id} to="/requests" className="bg-surface border rounded-lg p-3.5 flex items-center gap-2.5">
+                <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span className="text-[13.5px] font-extrabold">
+                    {b.slot_type === 'call' ? 'Phone call' : 'Meeting'} · {fmtSlot(b.starts_at)}
+                  </span>
+                  <span className="text-[12px] text-ink-muted">
+                    {b.status === 'confirmed'
+                      ? (b.slot_type === 'call' ? 'He rings you then.' : "He'll see you then.")
+                      : 'Waiting on the Rov — we text you when he answers.'}
+                  </span>
+                </div>
+                <span className={'flex-none rounded-chip px-2 py-[3px] text-[10.5px] font-bold ' +
+                  (b.status === 'confirmed' ? 'bg-good-bg text-good' : 'bg-warn-bg text-warn')}>
+                  {b.status === 'confirmed' ? 'Confirmed' : 'With the Rov'}
                 </span>
-                <Pill tone={STATUS_PILL[b.status]?.tone ?? 'info'}>{STATUS_PILL[b.status]?.label ?? b.status}</Pill>
-              </div>
-            </Link>
-          ))}
-          {open.map((s) => (
-            <Link key={s.id} to={`/requests/${s.id}`} className="bg-surface rounded-xl shadow-card p-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-extrabold text-[15.5px] tracking-tight">Question {s.ref}</span>
-                <Pill tone={STATUS_PILL[s.status]?.tone ?? 'info'}>{STATUS_PILL[s.status]?.label ?? s.status}</Pill>
-              </div>
-              {s.status !== 'answered' && s.expected_reply_text && (
-                <p className="text-[13.5px] text-ink-soft">{s.expected_reply_text} We'll text you.</p>
-              )}
-              {s.status === 'answered' && <p className="text-[13.5px] text-success-text font-bold">Tap to read the Rov's answer</p>}
-            </Link>
-          ))}
-        </>
-      )}
-    </div>
+              </Link>
+            ))}
+
+            {invitations.map((i) => (
+              <Link key={i.id} to="/requests" className="bg-surface border rounded-lg p-3.5 flex items-center gap-2.5">
+                <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span className="text-[13.5px] font-extrabold truncate">
+                    {OCCASION_LABELS[i.occasion]} · {fmtSlot(i.starts_at)}
+                  </span>
+                  <span className="text-[12px] text-ink-muted">
+                    {i.status === 'accepted' ? 'The Rov said yes.' : 'Nothing goes in his diary until he says yes.'}
+                  </span>
+                </div>
+                <span className={'flex-none rounded-chip px-2 py-[3px] text-[10.5px] font-bold ' +
+                  (i.status === 'accepted' ? 'bg-good-bg text-good' : 'bg-warn-bg text-warn')}>
+                  {i.status === 'accepted' ? 'Accepted' : 'With the Rov'}
+                </span>
+              </Link>
+            ))}
+          </>
+        )}
+      </div>
+    </Phone>
   );
 }

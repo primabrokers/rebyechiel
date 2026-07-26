@@ -1,9 +1,9 @@
 import { supabase } from './supabase';
 import {
-  demoAnswered, demoBookings, demoBriefing, demoCategories, demoHandedOff, demoProfiles,
-  demoQueue, demoSettings, demoSlotReleases, demoTimetable, demoTiers, isDemo,
+  demoAnswered, demoBookings, demoBriefing, demoCategories, demoHandedOff, demoInvitations,
+  demoProfiles, demoQueue, demoSettings, demoSlotReleases, demoTimetable, demoTiers, isDemo,
 } from './demo';
-import type { Booking, Category, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier } from '../types';
+import type { Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier } from '../types';
 
 // Direct table reads/writes for the admin side — all under the rabbi_is_admin() RLS policies.
 // Community-facing writes still go through the rabbi-public edge function.
@@ -61,7 +61,7 @@ export async function fetchProfilesByIds(ids: string[]): Promise<Map<string, Pro
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) return map;
   const { data } = await supabase.from('rabbi_profiles')
-    .select('id, role, full_name, phone, affiliation, is_active').in('id', unique);
+    .select('id, role, full_name, phone, affiliation, organisation, is_active').in('id', unique);
   for (const p of (data as Profile[]) ?? []) map.set(p.id, p);
   return map;
 }
@@ -120,4 +120,40 @@ export async function fetchHandedOffConversations(): Promise<{ id: string; phone
   const { data } = await supabase.from('rabbi_conversations')
     .select('id, phone, updated_at').eq('state', 'handed_off').order('updated_at', { ascending: false });
   return (data as { id: string; phone: string; updated_at: string }[]) ?? [];
+}
+
+export async function fetchInvitations(): Promise<Invitation[]> {
+  if (isDemo()) return demoInvitations;
+  const { data } = await supabase.from('rabbi_invitations')
+    .select('*').order('starts_at');
+  return (data as Invitation[]) ?? [];
+}
+
+export async function fetchPendingInvitations(): Promise<Invitation[]> {
+  if (isDemo()) return demoInvitations.filter((i) => i.status === 'requested');
+  const { data } = await supabase.from('rabbi_invitations')
+    .select('*').eq('status', 'requested').gte('starts_at', new Date().toISOString())
+    .order('starts_at');
+  return (data as Invitation[]) ?? [];
+}
+
+/**
+ * Does this invitation collide with the Rov's fixed week? He should never accept a drasha
+ * without being shown that his chosson lesson is at the same time.
+ */
+export function findClash(
+  startsAt: string,
+  durationMinutes: number,
+  blocks: TimetableBlock[],
+): TimetableBlock | null {
+  const start = new Date(startsAt);
+  const startMin = start.getHours() * 60 + start.getMinutes();
+  const endMin = startMin + durationMinutes;
+  const weekday = start.getDay();
+  return blocks.find((b) => {
+    if (b.weekday !== weekday || !b.is_active) return false;
+    const [bh, bm] = b.start_time.split(':').map(Number);
+    const [eh, em] = b.end_time.split(':').map(Number);
+    return startMin < eh * 60 + em && endMin > bh * 60 + bm;
+  }) ?? null;
 }

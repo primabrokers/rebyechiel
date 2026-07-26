@@ -1,5 +1,6 @@
-// Generates the PWA icons (pure Node, no deps): a brass open sefer on midnight blue, with
-// enough padding to survive Android's maskable crop. Rerun with: node scripts/gen-icons.cjs
+// Generates the PWA icons (pure Node, no deps): the app mark from the Rov Console design —
+// a white ר on the single indigo accent, full bleed so Android's maskable crop can't clip it.
+// Rerun with: node scripts/gen-icons.cjs
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
@@ -40,58 +41,46 @@ function encodePng(size, pixels) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
-// Signed distance of a rounded rectangle centred at (cx, cy).
-function sdRoundRect(px, py, cx, cy, hw, hh, r) {
-  const qx = Math.abs(px - cx) - (hw - r);
-  const qy = Math.abs(py - cy) - (hh - r);
-  const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
-  return Math.hypot(ox, oy) + Math.min(Math.max(qx, qy), 0) - r;
+/** Signed distance to a thick line segment — the two strokes a ר is made of. */
+function sdSegment(px, py, ax, ay, bx, by, halfWidth) {
+  const vx = bx - ax, vy = by - ay;
+  const wx = px - ax, wy = py - ay;
+  const len2 = vx * vx + vy * vy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2));
+  return Math.hypot(wx - vx * t, wy - vy * t) - halfWidth;
 }
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 function drawIcon(size) {
   const px = Buffer.alloc(size * size * 4);
-  const BG = [0x0F, 0x1E, 0x33], BG2 = [0x27, 0x4B, 0x7E];
-  const PAGE = [0xF3, 0xE8, 0xCF], EDGE = [0xB9, 0x8A, 0x2F];
-  const c = size / 2;
-  // Open-sefer geometry (relative to size): two page panels with a spine gap.
-  const pageHW = size * 0.185, pageHH = size * 0.21, pageR = size * 0.035;
-  const gap = size * 0.022;
-  const leftCx = c - pageHW - gap, rightCx = c + pageHW + gap;
-  const pageCy = c + size * 0.01;
+  const INDIGO = [0x5b, 0x4b, 0xe8], INDIGO_DEEP = [0x45, 0x36, 0xcc];
+  const WHITE = [0xff, 0xff, 0xff];
+
+  // ר: a top bar running right-to-left, and a stem descending from its right end. Kept inside
+  // the central 60% so a maskable crop never bites into it.
+  const x0 = size * 0.315, x1 = size * 0.655;
+  const yTop = size * 0.345, yBot = size * 0.685;
+  const half = size * 0.058;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      // Diagonal midnight gradient background (full bleed for maskable).
+      // A quiet diagonal in the accent, so the tile has some depth at 512px.
       const t = (x + y) / (2 * size);
-      let r = lerp(BG[0], BG2[0], t), g = lerp(BG[1], BG2[1], t), b = lerp(BG[2], BG2[2], t);
+      let r = lerp(INDIGO[0], INDIGO_DEEP[0], t);
+      let g = lerp(INDIGO[1], INDIGO_DEEP[1], t);
+      let b = lerp(INDIGO[2], INDIGO_DEEP[2], t);
 
-      // Brass base under the pages (the binding), drawn first.
-      const dBind = sdRoundRect(x, y, c, pageCy + pageHH * 0.55, pageHW * 2 + gap + size * 0.02, pageHH * 0.52, pageR);
-      if (dBind < 0) { r = EDGE[0]; g = EDGE[1]; b = EDGE[2]; }
-
-      // Pages.
-      const dL = sdRoundRect(x, y, leftCx, pageCy, pageHW, pageHH, pageR);
-      const dR = sdRoundRect(x, y, rightCx, pageCy, pageHW, pageHH, pageR);
-      const d = Math.min(dL, dR);
+      const d = Math.min(
+        sdSegment(x, y, x0, yTop, x1, yTop, half), // the bar
+        sdSegment(x, y, x1, yTop, x1, yBot, half), // the stem
+      );
       if (d < 0) {
-        r = PAGE[0]; g = PAGE[1]; b = PAGE[2];
-        // Text lines on each page: darker rules.
-        const lineH = Math.max(1, size * 0.016);
-        const lineGap = size * 0.062;
-        for (let li = -2; li <= 2; li++) {
-          const ly = pageCy + li * lineGap - size * 0.01;
-          const inLeft = Math.abs(y - ly) < lineH && Math.abs(x - leftCx) < pageHW * 0.68;
-          const inRight = Math.abs(y - ly) < lineH && Math.abs(x - rightCx) < pageHW * 0.68;
-          if (inLeft || inRight) { r = 0x8A; g = 0x76; b = 0x4A; }
-        }
-      }
-      // Soft anti-alias at page edges.
-      if (d >= 0 && d < 1.2) {
+        r = WHITE[0]; g = WHITE[1]; b = WHITE[2];
+      } else if (d < 1.2) {
         const a = 1 - d / 1.2;
-        r = lerp(r, PAGE[0], a * 0.6); g = lerp(g, PAGE[1], a * 0.6); b = lerp(b, PAGE[2], a * 0.6);
+        r = lerp(r, WHITE[0], a); g = lerp(g, WHITE[1], a); b = lerp(b, WHITE[2], a);
       }
       px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = 255;
     }

@@ -17,11 +17,15 @@ import {
  * happen client-side in rabbi-app. The SMS bot creates records through the same
  * _shared/rabbiCore.ts paths.
  *
- * Actions: public_config, bootstrap, me, slots, book, submit_shailah, withdraw, cancel_booking,
- * confirm_triage (admin), set_booking_status (admin).
+ * Actions: public_config, bootstrap, me, slots, book, submit_shailah, submit_invitation,
+ * withdraw, cancel_booking, cancel_invitation, confirm_triage (admin), set_booking_status
+ * (admin), set_invitation_status (admin).
  */
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+/** Mirrors the rabbi_invitation_occasion enum in the migration. */
+const OCCASIONS = ["sheva_brochos", "bar_mitzvah", "chanukas_habayis", "shloshim", "shiur", "other"];
 
 interface Profile {
   id: string;
@@ -82,8 +86,10 @@ Deno.serve(async (req: Request) => {
         return json({ error: "affiliation required" }, 400);
       }
       const phone = body.phone ? normalizePhone(String(body.phone)) : null;
+      const organisation = String(body.organisation ?? "").trim().slice(0, 120) || null;
       const { data: profile, error } = await admin.from("rabbi_profiles").insert({
         auth_user_id: authUserId, full_name: fullName, affiliation, phone, role: "community",
+        organisation: affiliation === "mosdos" ? organisation : null,
       }).select().single();
       if (error) return json({ error: error.message }, 400);
       return json({ profile });
@@ -155,6 +161,40 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true });
       }
 
+      // An invitation to speak — a drasha at a simcha, a shiur, an organisation's event. It never
+      // touches the diary: it sits as "requested" until the Rov answers it himself.
+      case "submit_invitation": {
+        const occasion = String(body.occasion ?? "");
+        if (!OCCASIONS.includes(occasion)) return json({ error: "occasion required" }, 400);
+        const startsAt = new Date(String(body.startsAt ?? ""));
+        if (Number.isNaN(startsAt.getTime())) return json({ error: "startsAt required" }, 400);
+        if (startsAt.getTime() < Date.now()) return json({ error: "starts_in_the_past" }, 400);
+        const duration = Math.min(180, Math.max(5, Number(body.durationMinutes) || 20));
+        const attendance = body.expectedAttendance != null ? Number(body.expectedAttendance) : null;
+
+        const { data: invitation, error } = await admin.from("rabbi_invitations").insert({
+          profile_id: caller.id,
+          channel: "app",
+          occasion,
+          starts_at: startsAt.toISOString(),
+          duration_minutes: duration,
+          location: body.location ? String(body.location).slice(0, 300) : null,
+          notes: body.notes ? String(body.notes).slice(0, 2000) : null,
+          expected_attendance: attendance && Number.isFinite(attendance) ? Math.round(attendance) : null,
+        }).select().single();
+        if (error) return json({ error: error.message }, 400);
+        return json({ invitation });
+      }
+
+      case "cancel_invitation": {
+        const id = String(body.invitationId ?? "");
+        const { data: row } = await admin.from("rabbi_invitations").select("id, profile_id, status").eq("id", id).maybeSingle();
+        if (!row || row.profile_id !== caller.id) return json({ error: "not_found" }, 404);
+        if (!["requested", "accepted"].includes(row.status)) return json({ error: "not_cancellable" }, 400);
+        await admin.from("rabbi_invitations").update({ status: "cancelled", updated_at: new Date().toISOString() }).eq("id", id);
+        return json({ ok: true });
+      }
+
       case "cancel_booking": {
         const id = String(body.bookingId ?? "");
         const { data: row } = await admin.from("rabbi_bookings").select("id, profile_id, status").eq("id", id).maybeSingle();
@@ -222,6 +262,21 @@ Deno.serve(async (req: Request) => {
         }).eq("id", id);
         if (error) return json({ error: error.message }, 400);
         return json({ ok: true }); // the notify cron texts the member about the change
+      }
+
+      case "set_invitation_status": {
+        if (!["rabbi", "assistant"].includes(caller.role)) return json({ error: "forbidden" }, 403);
+        const id = String(body.invitationId ?? "");
+        const status = String(body.status ?? "");
+        if (!["accepted", "declined", "cancelled"].includes(status)) return json({ error: "bad_status" }, 400);
+        const { error } = await admin.from("rabbi_invitations").update({
+          status,
+          decline_reason: status === "declined" ? (body.reason ? String(body.reason).slice(0, 300) : null) : null,
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", id);
+        if (error) return json({ error: error.message }, 400);
+        return json({ ok: true }); // the notify cron tells whoever asked
       }
 
       default:

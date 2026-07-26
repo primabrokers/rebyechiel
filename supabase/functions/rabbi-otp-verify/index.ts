@@ -79,8 +79,11 @@ Deno.serve(async (req: Request) => {
       } else {
         authUserId = created.user.id;
       }
+      // "Jewish High" tells the Rov far more than "mosdos" does, so the name is kept alongside.
+      const organisation = String(signup?.organisation ?? "").trim().slice(0, 120) || null;
       const { error: profErr } = await admin.from("rabbi_profiles").insert({
         auth_user_id: authUserId, full_name: fullName, affiliation,
+        organisation: affiliation === "mosdos" ? organisation : null,
         phone: dest, phone_verified_at: new Date().toISOString(), role: "community",
       });
       if (profErr && !profErr.message.includes("duplicate")) {

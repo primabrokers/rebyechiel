@@ -1,9 +1,9 @@
 # Rabbi Emanuel's Assistant
 
-Schedule and shailah management for Rabbi Yechiel Emanuel — a community app (ask a shailah,
-book a phone call, request a meeting) with an ultra-simple admin for the Rov, an AI PA that
-triages questions, a text-in SMS assistant for people without smartphones, and a daily
-morning briefing. Installable as a PWA on Android and iOS.
+Schedule and shailah management for Rabbi Yechiel Emanuel — a kehillah app (ask a shailah,
+book a phone call, ask to meet, invite the Rov to speak) with an ultra-simple console for the
+Rov, an AI PA that triages questions, a text-in SMS assistant for people without smartphones,
+and a daily morning briefing. Installable as a PWA on Android and iOS.
 
 ## Stack
 
@@ -48,15 +48,24 @@ value is treated as "not configured" and the feature simply stays off.
 Stored in the database vault (already set): `project_url`, `cron_internal_secret`,
 `RABBI_SMS_WEBHOOK_SECRET`.
 
-## Layouts
+## Design
 
-The Rov works from a phone, an Android tablet and a desktop, so his side changes shape rather
-than stretching. Below `md` it is a phone column with the floating tab bar; from `md` up the
-tabs become a fixed side rail, and from `lg` the pages split into columns — Today puts what
-needs a decision beside the day's diary, the queue goes two-up, and Diary and Settings pair
-their sections. Content is capped (`max-w-6xl`/`5xl`/`4xl` by page) so nothing sprawls on a wide
-monitor. The community side stays a single centred column at every size: it is three actions,
-and widening it would only make it harder to use.
+"Rov Console" — cool graphite with a single indigo accent, Manrope throughout and JetBrains
+Mono reserved for things that should read as data (times, refs, phone numbers). There is no
+second accent: green means settled, amber means waiting on a person, red means promised today.
+Tokens live in `tailwind.config.ts`; the source screens are in `design/`.
+
+Two grammars share the palette. The Rov's console is dense and desktop-first: below `md` it is
+a phone column with a bottom tab bar, from `md` up the tabs become a dark side rail carrying
+live counts, and from `lg` the pages split into columns — Today puts what needs a decision
+beside the day's diary, the queue becomes a table, and answering opens in a drawer over it so
+he never loses his place. The kehillah's screens are a phone app at every size: roomy, tappable,
+and centred on the page ground rather than stretched, because widening four actions would only
+make them harder to use.
+
+Anything pinned to the window (drawers, toasts) renders through `<Portal>`. Chromium keeps a
+containing block on an element that has animated its transform, so a `fixed` child inside a
+page that faded up would otherwise be measured against that page instead of the window.
 
 ## Preview mode
 
@@ -80,7 +89,8 @@ A banner sits above every screen so it cannot be mistaken for real data.
    He then lands on `/rabbi` automatically at every sign-in.
 2. **Text-in**: buy a reply-capable TextMagic number and point its inbound webhook at
    `https://neiqcssajyivkbfjcaet.supabase.co/functions/v1/rabbi-sms-inbound?secret=<RABBI_SMS_WEBHOOK_SECRET>`.
-3. The Rov sets his mobile number in the app (More → Messages to you) for briefings and nudges.
+3. The Rov sets his mobile number in the app (Settings → Where we reach you) for briefings and
+   nudges.
 
 ## Architecture notes
 
@@ -91,5 +101,9 @@ A banner sits above every screen so it cannot be mistaken for real data.
   Shabbos (proper yom tov calendar is a planned follow-up).
 - Sensitive categories (niddah, shalom bayis) are masked in every list, excluded from SMS
   content, and invisible to the `assistant` role at the RLS layer.
-- The SMS bot is a deterministic state machine; Claude only interprets and drafts. It never
-  answers halacha and hands off to a human after two confused turns.
+- The SMS bot is a deterministic state machine; the model only interprets and drafts. It never
+  answers halacha and hands off to a human after two confused turns — a handed-off conversation
+  shows up in the console's "Text-in line" panel as "one caller needs a person".
+- Invitations to speak (`rabbi_invitations`) never auto-confirm and never touch the diary: they
+  sit as `requested` until the Rov answers one himself, and Today shows him any clash with his
+  fixed week before he does.
