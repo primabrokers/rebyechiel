@@ -265,7 +265,20 @@ HARD RULES:
 CONVERSATION CONTEXT:
 - state: ${state}; intent: ${conv.intent ?? "unknown"}
 - known member: ${profile ? profile.full_name : "no — ask for a name before confirming"}
-- draft so far: ${JSON.stringify({ ...draft, offered_slots: undefined })}
+- ALREADY COLLECTED, never ask for these again: ${
+      [
+        draft.question ? `their question ("${String(draft.question).slice(0, 80)}")` : null,
+        (profile?.full_name ?? draft.name) ? `their name (${profile?.full_name ?? draft.name})` : null,
+        draft.urgency_slug ? `how urgent (${draft.urgency_slug})` : null,
+        draft.category_slug ? `the category (${draft.category_slug})` : null,
+      ].filter(Boolean).join("; ") || "nothing yet"
+    }
+- still needed: ${
+      [
+        !draft.question && conv.intent === "shailah" ? "their question" : null,
+        !(profile?.full_name ?? draft.name) ? "their name" : null,
+      ].filter(Boolean).join("; ") || "nothing \u2014 confirm what you have"
+    }
 - numbered slots currently offered: ${offered}
 - shailah categories (slug: name): ${(catQ.data ?? []).map((c) => `${c.slug}: ${c.name}`).join("; ")}
 - urgency tiers (slug: name): ${(tierQ.data ?? []).map((t) => `${t.slug}: ${t.name}`).join("; ")}
@@ -345,12 +358,30 @@ Only include updates fields you learned THIS turn. slot_index must reference the
       replyText = `These times are available:\n${menu}\nReply with the number you'd like${profile || newDraft.name ? "" : ", and please include your name"}.`;
     }
 
-    // Guard: never enter confirming without the material to confirm.
+    // The state machine advances on the FACTS, not on the model's opinion of them. Left to the
+    // model, it asked for a name it had already been given, three turns running: it can see the
+    // draft but it does not reliably act on it. So the moment we hold everything a shailah or a
+    // booking needs, code moves to confirming and writes the confirmation itself.
+    const who = profile?.full_name ?? newDraft.name ?? null;
+    const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who);
+    const bookingReady = (intent === "call" || intent === "meeting")
+      && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who);
+
     let finalState: ConvState = nextState;
-    if (nextState === "confirming") {
-      const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(profile || newDraft.name);
-      const bookingReady = (intent === "call" || intent === "meeting") && Boolean(newDraft.slot_index) && Boolean(profile || newDraft.name);
-      if (!shailahReady && !bookingReady) finalState = intent === "shailah" ? "collecting_shailah" : intent ? "collecting_booking" : "intent";
+    if (shailahReady) {
+      finalState = "confirming";
+      const urgent = newDraft.urgency_slug === "urgent";
+      const q = String(newDraft.question).replace(/\s+/g, " ").trim();
+      replyText = `Thank you ${who!.split(" ")[0]}. Sending to the Rov: "${q.length > 140 ? q.slice(0, 137) + "\u2026" : q}"`
+        + `${urgent ? " \u2014 marked urgent." : "."} Reply YES to send it, or NO to change it.`;
+    } else if (bookingReady) {
+      finalState = "confirming";
+      const slot = newDraft.offered_slots![newDraft.slot_index! - 1];
+      replyText = `To confirm: a ${newDraft.slot_type === "call" ? "phone call" : "meeting"} with the Rov at `
+        + `${fmtSlot(slot.startsAt, tz)} for ${who}. Reply YES to confirm or NO to cancel.`;
+    } else if (nextState === "confirming") {
+      // The model wanted to confirm without the material to confirm — stay and keep collecting.
+      finalState = intent === "shailah" ? "collecting_shailah" : intent ? "collecting_booking" : "intent";
     }
 
     return await reply(replyText, {
