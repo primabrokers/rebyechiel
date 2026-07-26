@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, MessageCircleQuestion, Phone, Users, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
+import { demoBookings, demoMyShailos, isDemo } from '../../lib/demo';
 import { useAuth } from '../../lib/auth';
 import { AFFILIATION_LABELS, type Booking, type Shailah } from '../../types';
 import { Display, Pill, SectionLabel } from '../shared/ui';
@@ -35,6 +36,11 @@ export function HomePage() {
 
   useEffect(() => {
     if (!profile) return;
+    if (isDemo()) {
+      setShailos(demoMyShailos);
+      setBookings(demoBookings.filter((b) => b.profile_id === profile.id && Date.parse(b.starts_at) > Date.now()));
+      return;
+    }
     // RLS scopes both queries to the caller's own rows.
     supabase.from('rabbi_shailos').select('*').order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => setShailos((data as Shailah[]) ?? []));

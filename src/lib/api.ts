@@ -1,4 +1,36 @@
 import { supabase } from './supabase';
+import {
+  demoBookings, demoCategories, demoMyShailos, demoProfile, demoRole, demoSlots, demoTiers, isDemo,
+} from './demo';
+
+// Preview mode answers every action from fixtures — nothing reaches the database, and the
+// actions that would write simply report success without doing anything.
+// deno-lint-ignore no-explicit-any
+async function demoResponse(action: string, payload: Record<string, unknown>): Promise<any> {
+  const role = demoRole() ?? 'member';
+  switch (action) {
+    case 'public_config':
+      return { categories: demoCategories, urgencyTiers: demoTiers };
+    case 'me':
+      return { profile: demoProfile(role) };
+    case 'slots':
+      return { slots: demoSlots(payload.slotType === 'meeting' ? 'meeting' : 'call') };
+    case 'book':
+      return { booking: { ...demoBookings[0], ref: 'B-0029', status: payload.slotType === 'meeting' ? 'requested' : 'confirmed' } };
+    case 'submit_shailah':
+      return {
+        shailah: {
+          id: 'demo-new', ref: 'S-0044',
+          due_at: new Date(Date.now() + 8 * 3_600_000).toISOString(),
+          expected_reply_text: 'The Rov expects to answer later today (by this evening).',
+        },
+      };
+    case 'my_requests':
+      return { shailos: demoMyShailos, bookings: demoBookings };
+    default:
+      return { ok: true };
+  }
+}
 
 // Thin wrapper over the rabbi-public edge function: all community writes go through it so the
 // promise calculation and capacity checks live server-side (see supabase/functions/rabbi-public).
@@ -7,6 +39,7 @@ export async function api<T = Record<string, unknown>>(
   action: string,
   payload: Record<string, unknown> = {},
 ): Promise<T> {
+  if (isDemo()) return demoResponse(action, payload) as Promise<T>;
   const { data, error } = await supabase.functions.invoke('rabbi-public', {
     body: { action, ...payload },
   });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { isDemo } from '../../lib/demo';
 import { fetchCategories, fetchSettings, fetchTiers } from '../../lib/rabbiData';
 import type { Category, Settings, UrgencyTier } from '../../types';
 import { BigButton, Display, Field, SectionLabel, Spinner, inputCls } from '../shared/ui';
@@ -25,6 +26,7 @@ export function MorePage() {
 
   const patch = async (fields: Partial<Settings>) => {
     setSettings({ ...settings, ...fields });
+    if (isDemo()) { setSaved(true); setTimeout(() => setSaved(false), 1500); return; }
     await supabase.from('rabbi_settings').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', 1);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -32,6 +34,7 @@ export function MorePage() {
 
   const toggleCategory = async (c: Category) => {
     setCats(cats.map((x) => x.id === c.id ? { ...x, is_active: !c.is_active } : x));
+    if (isDemo()) return;
     await supabase.from('rabbi_categories').update({ is_active: !c.is_active }).eq('id', c.id);
   };
 

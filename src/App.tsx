@@ -1,6 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { isConfigured, missingEnvVars } from './lib/supabase';
+import { isDemo } from './lib/demo';
+import { PreviewBanner } from './components/shared/PreviewBanner';
+import { PreviewPage } from './components/PreviewPage';
 import { Display, Spinner } from './components/shared/ui';
 import { LoginPage } from './components/auth/LoginPage';
 import { SignUpPage } from './components/auth/SignUpPage';
@@ -29,6 +32,7 @@ function Gate({ children, admin }: { children: JSX.Element; admin?: boolean }) {
 
 function PublicOnly({ children }: { children: JSX.Element }) {
   const { loading, session, profile, needsBootstrap } = useAuth();
+  if (isDemo()) return children;
   if (loading) return <Spinner />;
   if (session && !needsBootstrap) {
     return <Navigate to={profile && ['rabbi', 'assistant'].includes(profile.role) ? '/rabbi' : '/'} replace />;
@@ -66,7 +70,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PreviewBanner />
         <Routes>
+          <Route path="/preview" element={<PreviewPage />} />
           <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
           <Route path="/signup" element={<SignUpPage />} />
 

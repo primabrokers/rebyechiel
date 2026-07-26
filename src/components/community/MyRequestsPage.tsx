@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { demoBookings, demoMyShailos, isDemo } from '../../lib/demo';
 import { api } from '../../lib/api';
 import type { Booking, Shailah } from '../../types';
 import { BigButton, Display, EmptyState, Pill, SectionLabel, Spinner } from '../shared/ui';
@@ -29,6 +30,7 @@ export function MyRequestsPage() {
   const [bookings, setBookings] = useState<Booking[] | null>(null);
 
   useEffect(() => {
+    if (isDemo()) { setShailos(demoMyShailos); setBookings(demoBookings); return; }
     supabase.from('rabbi_shailos').select('*').order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => setShailos((data as Shailah[]) ?? []));
     supabase.from('rabbi_bookings').select('*').order('starts_at', { ascending: false }).limit(50)
@@ -88,6 +90,7 @@ export function RequestDetailPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (isDemo()) { setShailah(demoMyShailos.find((x) => x.id === id) ?? null); return; }
     supabase.from('rabbi_shailos').select('*').eq('id', id).maybeSingle()
       .then(({ data }) => setShailah((data as Shailah | null) ?? null));
   }, [id]);

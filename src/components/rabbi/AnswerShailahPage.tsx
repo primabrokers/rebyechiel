@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Mic, Phone, Square } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { isDemo } from '../../lib/demo';
 import { fetchCategories, fetchProfilesByIds, fetchShailah } from '../../lib/rabbiData';
 import type { Category, Profile, Shailah } from '../../types';
 import { AFFILIATION_LABELS } from '../../types';
@@ -41,6 +42,11 @@ export function AnswerShailahPage() {
         if (blob.size < 1000) return; // accidental tap
         setTranscribing(true);
         try {
+          if (isDemo()) {
+            setAnswer((prev) => (prev.trim() ? prev.trimEnd() + '\n' : '') +
+              'The soup is fine to eat. Put the spoon aside and bring it to me after Maariv.');
+            return;
+          }
           const buf = await blob.arrayBuffer();
           let binary = '';
           const bytes = new Uint8Array(buf);
@@ -98,6 +104,7 @@ export function AnswerShailahPage() {
 
   const save = async (status: 'answered' | 'in_progress' | 'closed', withAnswer: boolean) => {
     setBusy(true); setError(null);
+    if (isDemo()) { setBusy(false); nav('/rabbi/questions'); return; }
     // Direct update under the admin RLS policy; the notify cron texts "answer ready".
     const { error: err } = await supabase.from('rabbi_shailos').update({
       ...(withAnswer ? { answer: answer.trim() || null } : {}),

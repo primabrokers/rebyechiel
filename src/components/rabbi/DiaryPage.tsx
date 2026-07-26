@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '../../lib/supabase';
+import { isDemo } from '../../lib/demo';
 import { fetchProfilesByIds, fetchSlotReleases, fetchTimetable, fetchUpcomingBookings } from '../../lib/rabbiData';
 import type { Booking, Profile, SlotRelease, TimetableBlock } from '../../types';
 import { BigButton, Display, Field, Pill, SectionLabel, Spinner, inputCls } from '../shared/ui';
@@ -42,10 +43,12 @@ export function DiaryPage() {
     (b.profile_id && profiles.get(b.profile_id)?.full_name) || b.contact_name || 'Text-in caller';
 
   const closeRelease = async (id: string) => {
+    if (isDemo()) return;
     await supabase.from('rabbi_slot_releases').update({ status: 'closed' }).eq('id', id);
     await load();
   };
   const removeBlock = async (id: string) => {
+    if (isDemo()) return;
     await supabase.from('rabbi_timetable_blocks').update({ is_active: false }).eq('id', id);
     await load();
   };
@@ -151,6 +154,7 @@ function ReleaseSheet({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const saveRelease = async () => {
+    if (isDemo()) { onClose(); return; }
     setBusy(true); setError(null);
     const starts = new Date(`${date}T${from}:00`);
     const ends = new Date(`${date}T${to}:00`);
@@ -218,6 +222,7 @@ function BlockSheet({ onClose }: { onClose: () => void }) {
     setWeekdays((w) => w.includes(d) ? w.filter((x) => x !== d) : [...w, d]);
 
   const saveBlock = async () => {
+    if (isDemo()) { onClose(); return; }
     setBusy(true); setError(null);
     if (!weekdays.length) { setError('Pick at least one day.'); setBusy(false); return; }
     if (to <= from) { setError('The end time must be after the start.'); setBusy(false); return; }

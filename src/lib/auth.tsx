@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { api } from './api';
+import { demoProfile, demoRole, exitDemo, isDemo } from './demo';
 import type { Profile } from '../types';
 
 interface AuthState {
@@ -41,6 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Preview mode is signed in as a sample person and never talks to Supabase auth.
+    if (isDemo()) {
+      setProfile(demoProfile(demoRole()!));
+      setSession({ user: { id: 'demo-user' } } as unknown as Session);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
@@ -57,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   const signOut = useCallback(async () => {
+    // In preview, "sign out" just leaves preview mode.
+    if (isDemo()) { exitDemo(); return; }
     await supabase.auth.signOut();
     setProfile(null);
   }, []);

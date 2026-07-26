@@ -48,11 +48,26 @@ value is treated as "not configured" and the feature simply stays off.
 Stored in the database vault (already set): `project_url`, `cron_internal_secret`,
 `RABBI_SMS_WEBHOOK_SECRET`.
 
+## Preview mode
+
+`/preview` lets anyone click through both sides with invented sample data and no login —
+useful for showing the Rov or the committee before there is anything real in the system.
+`?preview=rabbi` and `?preview=member` jump straight in; the choice sticks for the browser tab.
+
+Preview never reads or writes the database: the data layer returns fixtures from
+`src/lib/demo.ts` and every action is a no-op, so it is safe to leave enabled on the live site.
+A banner sits above every screen so it cannot be mistaken for real data.
+
 ## One-time setup
 
-1. **Make the Rov admin** after he signs up in the app:
-   `UPDATE rabbi_profiles SET role = 'rabbi' WHERE phone = '+44…';`
-   (use `'assistant'` for a rebbetzin/gabbai — assistants never see sensitive shailos).
+1. **Make the Rov admin.** He signs up in the app (email + password works with no keys
+   configured), then promote that account:
+   ```sql
+   UPDATE rabbi_profiles p SET role = 'rabbi'
+   FROM auth.users u WHERE u.id = p.auth_user_id AND u.email = 'his@email';
+   ```
+   Use `'assistant'` for a rebbetzin or gabbai — assistants never see sensitive shailos.
+   He then lands on `/rabbi` automatically at every sign-in.
 2. **Text-in**: buy a reply-capable TextMagic number and point its inbound webhook at
    `https://neiqcssajyivkbfjcaet.supabase.co/functions/v1/rabbi-sms-inbound?secret=<RABBI_SMS_WEBHOOK_SECRET>`.
 3. The Rov sets his mobile number in the app (More → Messages to you) for briefings and nudges.
