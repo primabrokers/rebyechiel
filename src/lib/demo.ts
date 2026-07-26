@@ -9,7 +9,8 @@
 // sticks for the browser tab, so navigating around keeps you in preview.
 
 import type {
-  Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier,
+  Availability, Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimeOff,
+  TimetableBlock, UrgencyTier,
 } from '../types';
 
 export type DemoRole = 'rabbi' | 'member';
@@ -66,6 +67,9 @@ const CAT = {
   business: 'demo-cat-business',
   chinuch: 'demo-cat-chinuch',
   shalom: 'demo-cat-shalom',
+  aveilus: 'demo-cat-aveilus',
+  simcha: 'demo-cat-simcha',
+  other: 'demo-cat-other',
 } as const;
 const TIER = { urgent: 'demo-tier-urgent', soon: 'demo-tier-soon', standard: 'demo-tier-standard' } as const;
 const PROFILE = { rov: 'demo-profile-rov', dovid: 'demo-profile-dovid', rivky: 'demo-profile-rivky', yosef: 'demo-profile-yosef' } as const;
@@ -77,6 +81,9 @@ export const demoCategories: Category[] = [
   { id: CAT.business, slug: 'business', name: 'Business & money', description: 'Choshen mishpat, ribbis, contracts, disputes.', default_same_day: false, is_sensitive: false, sort_order: 4, is_active: true },
   { id: CAT.chinuch, slug: 'chinuch', name: 'Chinuch', description: 'Schooling, children, guidance for parents.', default_same_day: false, is_sensitive: false, sort_order: 5, is_active: true },
   { id: CAT.shalom, slug: 'shalom_bayis', name: 'Shalom bayis', description: 'Handled privately, by the Rov alone.', default_same_day: false, is_sensitive: true, sort_order: 6, is_active: true },
+  { id: CAT.aveilus, slug: 'aveilus', name: 'Aveilus', description: 'Mourning practices and related questions.', default_same_day: false, is_sensitive: false, sort_order: 7, is_active: true },
+  { id: CAT.simcha, slug: 'simcha', name: 'Simchos & life events', description: 'Weddings, brissim, bar mitzvahs.', default_same_day: false, is_sensitive: false, sort_order: 8, is_active: true },
+  { id: CAT.other, slug: 'other', name: 'Something else', description: 'Anything that does not fit the above — just write it in your own words.', default_same_day: false, is_sensitive: false, sort_order: 9, is_active: true },
 ];
 
 export const demoTiers: UrgencyTier[] = [
@@ -202,26 +209,45 @@ export const demoTimetable: TimetableBlock[] = [
   { id: 'demo-t-13', weekday: 5, start_time: '17:00', end_time: '19:00', label: 'Family time', block_type: 'family', is_active: true },
 ];
 
+/** The weekly pattern — what he keeps every week without touching it again. */
+export const demoAvailability: Availability[] = [
+  { id: 'demo-a-1', slot_type: 'call', weekday: 0, start_time: '19:00', end_time: '20:00', duration_minutes: 10, location: null, is_active: true },
+  { id: 'demo-a-2', slot_type: 'call', weekday: 3, start_time: '21:00', end_time: '21:30', duration_minutes: 10, location: null, is_active: true },
+  { id: 'demo-a-3', slot_type: 'meeting', weekday: 2, start_time: '20:00', end_time: '21:30', duration_minutes: 30, location: 'Shul office', is_active: true },
+];
+
+export const demoTimeOff: TimeOff[] = [];
+
 export const demoSlotReleases: SlotRelease[] = [
   { id: 'demo-r-1', slot_type: 'call', starts_at: nextWeekdayAt(0, 19, 0), ends_at: nextWeekdayAt(0, 20, 0), duration_minutes: 10, location: null, status: 'open' },
   { id: 'demo-r-2', slot_type: 'meeting', starts_at: nextWeekdayAt(2, 20, 0), ends_at: nextWeekdayAt(2, 21, 30), duration_minutes: 30, location: 'Shul office', status: 'open' },
 ];
 
-/** Bookable slots offered to a community member, expanded from the sample releases. */
+/**
+ * Bookable slots offered to a community member — expanded from the weekly pattern the same way
+ * the server does it, so preview shows what the kehillah would really be offered.
+ */
 export function demoSlots(slotType: 'call' | 'meeting') {
-  const release = demoSlotReleases.find((r) => r.slot_type === slotType)!;
-  const dur = release.duration_minutes * 60_000;
-  const out = [];
-  for (let i = 0; i < 4; i++) {
-    const s = Date.parse(release.starts_at) + i * dur;
-    if (s + dur > Date.parse(release.ends_at)) break;
-    out.push({
-      releaseId: release.id, slotType,
-      startsAt: new Date(s).toISOString(), endsAt: new Date(s + dur).toISOString(),
-      location: release.location,
-    });
+  const out: { releaseId: string; slotType: 'call' | 'meeting'; startsAt: string; endsAt: string; location: string | null }[] = [];
+  for (const a of demoAvailability.filter((x) => x.slot_type === slotType)) {
+    const [sh, sm] = a.start_time.split(':').map(Number);
+    const [eh, em] = a.end_time.split(':').map(Number);
+    const dur = a.duration_minutes * 60_000;
+    // The next two occurrences of that weekday, so there is more than one day to choose from.
+    for (let week = 0; week < 2; week++) {
+      const start = new Date(nextWeekdayAt(a.weekday, sh, sm));
+      start.setDate(start.getDate() + week * 7);
+      const end = new Date(start); end.setHours(eh, em, 0, 0);
+      for (let t = start.getTime(); t + dur <= end.getTime(); t += dur) {
+        out.push({
+          releaseId: `weekly:${a.id}`, slotType,
+          startsAt: new Date(t).toISOString(), endsAt: new Date(t + dur).toISOString(),
+          location: a.location,
+        });
+      }
+    }
   }
-  return out;
+  return out.sort((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 12);
 }
 
 export const demoSettings: Settings = {

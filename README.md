@@ -100,6 +100,11 @@ A banner sits above every screen so it cannot be mistaken for real data.
 
 - Community writes go through the `rabbi-public` edge function so reply promises and slot
   capacity can't be bypassed; the SMS bot commits through the same `_shared/rabbiCore.ts` paths.
+- Bookable times come from a weekly pattern, not hand-made windows: `rabbi_availability` holds
+  "every Sunday 19:00–20:00, ten minutes each", `expandSlots()` projects it onto the next 21
+  days, and `rabbi_time_off` takes a date out of it. One-off `rabbi_slot_releases` are additions
+  on top, for a genuinely extra hour. Shabbos, his fixed timetable, and anything already booked
+  are subtracted from the result — so a slot is only ever offered if it is really free.
 - Reply promises are deterministic (`_shared/rabbiEta.ts`): same-day categories (niddah) with a
   configurable cutoff, hour-based and queue-based tiers, and nothing is ever promised or sent on
   Shabbos (proper yom tov calendar is a planned follow-up).

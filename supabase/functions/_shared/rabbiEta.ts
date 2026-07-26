@@ -61,15 +61,20 @@ function tzOffsetMs(ts: number, tz: string): number {
   return loc.getTime() - utc.getTime();
 }
 
-// The UTC instant of (local calendar day of `base` + dayOffset) at local `hour`:00 in tz.
-export function atLocalHour(base: Date, tz: string, dayOffset: number, hour: number): Date {
+// The UTC instant of (local calendar day of `base` + dayOffset) at local hour:minute in tz.
+export function atLocalTime(base: Date, tz: string, dayOffset: number, hour: number, minute = 0): Date {
   const p = localParts(base, tz);
   // Work off UTC noon of the local calendar date to avoid DST-boundary day slips.
   const dayUtcNoon = Date.UTC(p.year, p.month - 1, p.day + dayOffset, 12);
-  const guess = Date.UTC(p.year, p.month - 1, p.day + dayOffset, hour);
+  const guess = Date.UTC(p.year, p.month - 1, p.day + dayOffset, hour, minute);
   const withOffset = guess - tzOffsetMs(dayUtcNoon, tz);
   // One refinement pass in case the offset differs at the target instant itself.
   return new Date(guess - tzOffsetMs(withOffset, tz));
+}
+
+/** Whole-hour form, which is all the promise engine ever needs. */
+export function atLocalHour(base: Date, tz: string, dayOffset: number, hour: number): Date {
+  return atLocalTime(base, tz, dayOffset, hour, 0);
 }
 
 function rollOffShabbos(due: Date, tz: string, promiseHour: number): Date {

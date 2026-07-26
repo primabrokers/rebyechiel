@@ -112,6 +112,37 @@ export interface SlotRelease {
   status: 'open' | 'closed';
 }
 
+/**
+ * A time the Rov keeps every week — "Sunday 19:00–20:00, ten minutes each". Set once, and the
+ * kehillah can book it for as long as he leaves it on. Weekday 0 = Sunday; never Shabbos.
+ */
+export interface Availability {
+  id: string;
+  slot_type: 'call' | 'meeting';
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  location: string | null;
+  is_active: boolean;
+}
+
+/** A date the weekly pattern doesn't run — he's away, or it's yom tov. */
+export interface TimeOff {
+  id: string;
+  on_date: string;
+  reason: string | null;
+}
+
+/** How many people a weekly window can take — the number he actually cares about. */
+export function slotsInWindow(a: Pick<Availability, 'start_time' | 'end_time' | 'duration_minutes'>): number {
+  const mins = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+  return Math.max(0, Math.floor((mins(a.end_time) - mins(a.start_time)) / a.duration_minutes));
+}
+
 export interface Settings {
   id: number;
   timezone: string;

@@ -1,4 +1,4 @@
-import { atLocalHour, computeEta, localParts } from "./rabbiEta.ts";
+import { atLocalHour, atLocalTime, computeEta, localParts } from "./rabbiEta.ts";
 
 // Local assertions so the test runs without registry access (jsr is unreachable in some CI nets).
 function assert(cond: boolean, msg = "assertion failed"): void {
@@ -66,4 +66,22 @@ Deno.test("atLocalHour handles DST-less winter dates too", () => {
   const d = atLocalHour(winter, "Europe/London", 1, 22);
   const p = localParts(d, "Europe/London");
   assertEquals([p.day, p.hour], [15, 22]);
+});
+
+// The weekly call pattern lands on real minutes, so atLocalTime has to be right either side of
+// a clocks change — "19:00 every Sunday" must stay 19:00 in October as well as in July.
+Deno.test("atLocalTime keeps the local wall clock across DST", () => {
+  const TZ = "Europe/London";
+  const local = (d: Date) =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+
+  // BST: 19:00 local is 18:00Z.
+  assertEquals(atLocalTime(new Date("2026-07-26T10:00:00Z"), TZ, 0, 19, 0).toISOString(), "2026-07-26T18:00:00.000Z");
+  // GMT: 19:00 local is 19:00Z.
+  assertEquals(atLocalTime(new Date("2026-01-11T10:00:00Z"), TZ, 0, 19, 0).toISOString(), "2026-01-11T19:00:00.000Z");
+  // Minutes, not just hours.
+  assertEquals(local(atLocalTime(new Date("2026-07-26T10:00:00Z"), TZ, 1, 6, 30)), "06:30");
+  // The two changeover Sundays themselves.
+  assertEquals(local(atLocalTime(new Date("2026-10-25T10:00:00Z"), TZ, 0, 19, 0)), "19:00");
+  assertEquals(local(atLocalTime(new Date("2026-03-29T10:00:00Z"), TZ, 0, 19, 0)), "19:00");
 });

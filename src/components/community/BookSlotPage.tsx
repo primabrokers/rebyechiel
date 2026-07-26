@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 import { api } from '../../lib/api';
 import type { Slot } from '../../types';
 import {
-  BigButton, Choice, EmptyState, Headline, Note, PromisePanel, Screen, Spinner, StepBar, textareaCls,
+  BigButton, EmptyState, Headline, Note, PromisePanel, Screen, Spinner, StepBar, textareaCls,
 } from '../shared/ui';
 import { fmtSlot } from '../../lib/format';
 
@@ -29,6 +30,19 @@ export function BookSlotPage() {
       .catch(() => setError('Could not load times — try again shortly.'));
   };
   useEffect(load, [type]);
+
+  // One heading per day, times underneath — the shape of "when could I speak to him?".
+  const byDay = useMemo(() => {
+    const map = new Map<string, Slot[]>();
+    for (const s of slots ?? []) {
+      const key = format(new Date(s.startsAt), 'yyyy-MM-dd');
+      (map.get(key) ?? map.set(key, []).get(key)!).push(s);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [slots]);
+  const mins = slots?.length
+    ? Math.round((Date.parse(slots[0].endsAt) - Date.parse(slots[0].startsAt)) / 60000)
+    : 0;
 
   const book = async () => {
     if (!chosen) return;
@@ -105,16 +119,34 @@ export function BookSlotPage() {
         )}
 
         {slots && slots.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {slots.map((s) => (
-              <Choice key={s.releaseId + s.startsAt}
-                selected={chosen?.startsAt === s.startsAt && chosen?.releaseId === s.releaseId}
-                onClick={() => setChosen(s)}
-                title={fmtSlot(s.startsAt)}
-                sub={`${Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / 60000)}-minute ${
-                  type === 'call' ? 'phone call' : 'meeting'}${s.location ? ` · ${s.location}` : ''}`}
-              />
+          <div className="flex flex-col gap-4">
+            {byDay.map(([day, daySlots]) => (
+              <div key={day} className="flex flex-col gap-2">
+                <span className="text-[12.5px] font-bold text-ink-soft">
+                  {format(new Date(`${day}T12:00:00`), 'EEEE d MMMM')}
+                  <span className="font-normal text-ink-muted">
+                    {' · '}{daySlots.length} {daySlots.length === 1 ? 'time' : 'times'}
+                    {daySlots[0].location ? ` · ${daySlots[0].location}` : ''}
+                  </span>
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {daySlots.map((s) => {
+                    const picked = chosen?.startsAt === s.startsAt && chosen?.releaseId === s.releaseId;
+                    return (
+                      <button key={s.releaseId + s.startsAt} type="button" onClick={() => setChosen(s)}
+                        className={'rounded-ctl px-4 py-3 font-mono text-[14px] font-semibold border-[1.5px] transition-colors '
+                          + (picked ? 'bg-graphite text-white border-graphite' : 'bg-surface border-firm hover:bg-canvas')}>
+                        {format(new Date(s.startsAt), 'HH:mm')}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
+            <span className="text-[12px] text-ink-muted">
+              {mins}-minute {type === 'call' ? 'call' : 'meeting'} each. Times he keeps every week, so there's
+              always one coming.
+            </span>
           </div>
         )}
 

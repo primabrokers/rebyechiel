@@ -1,9 +1,13 @@
 import { supabase } from './supabase';
 import {
-  demoAnswered, demoBookings, demoBriefing, demoCategories, demoHandedOff, demoInvitations,
-  demoProfiles, demoQueue, demoSettings, demoSlotReleases, demoTimetable, demoTiers, isDemo,
+  demoAnswered, demoAvailability, demoBookings, demoBriefing, demoCategories, demoHandedOff,
+  demoInvitations, demoProfiles, demoQueue, demoSettings, demoSlotReleases, demoTimeOff,
+  demoTimetable, demoTiers, isDemo,
 } from './demo';
-import type { Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimetableBlock, UrgencyTier } from '../types';
+import type {
+  Availability, Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimeOff,
+  TimetableBlock, UrgencyTier,
+} from '../types';
 
 // Direct table reads/writes for the admin side — all under the rabbi_is_admin() RLS policies.
 // Community-facing writes still go through the rabbi-public edge function.
@@ -95,6 +99,21 @@ export async function fetchSlotReleases(): Promise<SlotRelease[]> {
   const { data } = await supabase.from('rabbi_slot_releases')
     .select('*').gte('ends_at', new Date().toISOString()).order('starts_at');
   return (data as SlotRelease[]) ?? [];
+}
+
+export async function fetchAvailability(): Promise<Availability[]> {
+  if (isDemo()) return demoAvailability;
+  const { data } = await supabase.from('rabbi_availability')
+    .select('*').eq('is_active', true).order('weekday').order('start_time');
+  return (data as Availability[]) ?? [];
+}
+
+export async function fetchTimeOff(): Promise<TimeOff[]> {
+  if (isDemo()) return demoTimeOff;
+  const today = new Date();
+  const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const { data } = await supabase.from('rabbi_time_off').select('*').gte('on_date', key).order('on_date');
+  return (data as TimeOff[]) ?? [];
 }
 
 export async function fetchSettings(): Promise<Settings | null> {

@@ -108,7 +108,7 @@ export function RabbiShell() {
           </div>
           <NavLink to="/rabbi/diary"
             className="ml-auto flex-none rounded-ctl bg-indigo px-4 py-2.5 text-[13px] font-bold text-white hover:bg-indigo-deep">
-            <span className="hidden sm:inline">Open times for calls</span>
+            <span className="hidden sm:inline">Open times to book</span>
             <span className="sm:hidden">Open times</span>
           </NavLink>
         </div>
