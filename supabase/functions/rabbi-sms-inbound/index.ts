@@ -418,6 +418,20 @@ Only include updates fields you learned THIS turn. slot_index must reference the
       && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who)
       && Boolean(newDraft.purpose);
 
+    // Last line of defence: never send a reply that asks for something we already hold. The
+    // prompt tells the model what it has and the gate below advances on facts, but a model that
+    // ignores both would otherwise send "what is your question?" to someone who just sent it —
+    // which is how this felt broken to real people. Rewrite the reply rather than send it.
+    const asksForQuestion = /what (is |was )?(your|the) (question|shailah)|send (me )?(your|the) (question|shailah)|what.{0,12}(would you like to|do you want to) ask/i;
+    const asksForName = /what (is |should )?(your|the) name|may i (have|take) your name|who (is|am i) (this|speaking)/i;
+    if (newDraft.question && asksForQuestion.test(replyText)) {
+      replyText = who
+        ? `Thank you \u2014 I have your question. One moment while I put it to the Rov.`
+        : `Thank you \u2014 I have your question. What name should I put on it?`;
+    } else if (who && asksForName.test(replyText)) {
+      replyText = `Thank you ${who.split(" ")[0]}. I have what I need \u2014 putting it to the Rov now.`;
+    }
+
     let finalState: ConvState = nextState;
     if (shailahReady) {
       finalState = "confirming";
