@@ -88,6 +88,10 @@ export default function App() {
           <Route path="/requests" element={<Gate><MyRequestsPage /></Gate>} />
           <Route path="/requests/:id" element={<Gate><RequestDetailPage /></Gate>} />
 
+          {/* Something he can say down the phone. Works today on the domain that already exists;
+              if rov.rebyechiel.org is added in Vercel later it lands in the same place. */}
+          <Route path="/rov" element={<Navigate to="/rabbi" replace />} />
+
           {/* Answering moved into a drawer over the queue, so there is no separate answer route. */}
           <Route path="/rabbi" element={<Gate admin><RabbiShell /></Gate>}>
             <Route index element={<TodayPage />} />
