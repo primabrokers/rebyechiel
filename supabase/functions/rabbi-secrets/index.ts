@@ -21,6 +21,10 @@ const ALLOWED = [
   "TEXTMAGIC_API_KEY",
   "TEXTMAGIC_SENDER",
   "OPENAI_API_KEY",
+  // Not a secret, but it lives here so the model behind the text-in assistant can be changed
+  // from Settings rather than by a deploy — the quickest way to tell whether a wrong answer is
+  // the model's fault or the prompt's.
+  "OPENAI_SMS_MODEL",
   "RABBI_SMS_WEBHOOK_SECRET",
 ] as const;
 

@@ -141,6 +141,15 @@ const THANKS_RE =
 const STATUS_RE =
   /\b(any news|any update|heard back|did (he|the rov) (answer|reply|get|see)|is there an answer|has (he|the rov) (answered|replied)|what'?s happening (with|about)|where (are we|is it) up to|still waiting)\b/i;
 
+/** A way out of a conversation that has gone wrong, without waiting for it to time out. */
+const RESET_RE =
+  /^\s*(refresh|reset|restart|start again|start over|start afresh|begin again|new question|new shailah|clear|cancel that)\s*[!.?]*\s*$/i;
+
+/** Only used before the draft exists, so it reads the profile rather than the conversation. */
+function knownNameOf(p: { full_name?: string | null } | null | undefined): string | null {
+  return p?.full_name ?? null;
+}
+
 /** Calling off or moving something already in the diary. */
 const CANCEL_RE =
   /\b(cancel|call it off|can'?t make it|cannot make it|won'?t be able to (make|come|be there)|need to (cancel|rearrange|reschedule|move)|move my (appointment|meeting|call|time)|something'?s come up)\b/i;
@@ -185,9 +194,13 @@ Deno.serve(async (req: Request) => {
       // Known member or a contact we've met before? (Optional — SMS works fine for strangers too.)
       admin.from("rabbi_profiles")
         .select("id, full_name, phone").eq("phone", from).eq("is_active", true).maybeSingle(),
-      // Active conversation or a fresh one.
+      // The conversation still running, if there is one. A stale one is NOT it: expires_at was
+      // being written on every turn and never read, so a thread left mid-sentence on Sunday was
+      // still "current" on Thursday — and a handed_off one swallowed every text after it in
+      // silence, because a human was said to own a thread nobody was still looking at.
       admin.from("rabbi_conversations")
         .select("*").eq("phone", from).neq("state", "done")
+        .gt("expires_at", new Date().toISOString())
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
       // Only this one has to wait for the settings, for the timezone.
       settingsP.then((s) => restWindow(admin, s.timezone, REST_NOTICE_MINUTES)).catch(() => null),
@@ -195,6 +208,18 @@ Deno.serve(async (req: Request) => {
     const tz = settings.timezone;
     const profile = profileRes.data;
     let conv = existingRes.data;
+
+    // "REFRESH" wipes the slate and starts again — put in for testing, but it earns its place:
+    // somebody who has tied themselves in knots needs a way out that isn't waiting four hours.
+    // It closes the thread and opens a new one rather than editing this one, so what happened is
+    // still on the record, and it works even from handed_off, which nothing else does.
+    const wantsReset = RESET_RE.test(text);
+    if (wantsReset && conv) {
+      await admin.from("rabbi_conversations")
+        .update({ state: "done", updated_at: new Date().toISOString() }).eq("id", conv.id);
+      conv = null;
+    }
+
     if (!conv) {
       const { data: created, error } = await admin.from("rabbi_conversations").insert({
         phone: from, profile_id: profile?.id ?? null, channel: "sms",
@@ -251,6 +276,13 @@ Deno.serve(async (req: Request) => {
     if (["stop", "unsubscribe"].includes(lower)) {
       await admin.from("rabbi_conversations").update({ state: "done", updated_at: new Date().toISOString() }).eq("id", conv.id);
       return json({ ok: true }); // no reply to a STOP
+    }
+    if (wantsReset) {
+      return await reply(
+        (knownNameOf(profile) ? `Right, ${knownNameOf(profile)!.split(" ")[0]} — ` : "Right — ")
+        + "starting again with a clean sheet. " + WELCOME_MENU,
+        { state: "intent", intent: null, draft: {}, turn_count: 0 },
+      );
     }
     if (conv.state === "handed_off") {
       return json({ ok: true }); // a human owns this thread now; stay silent
@@ -565,6 +597,17 @@ Erev Shabbos or erev yom tov, and food on the fire, are not "standard". If it is
 before Shabbos, say plainly that the Rov may ring rather than text back, so they are not sitting
 waiting on a phone that is about to go away for 25 hours.
 
+IS THIS THE SAME SUBJECT, OR A NEW ONE? (decide every turn, set "new_topic")
+Only you can tell these apart, so you are asked outright:
+- "Nurofen, for a headache" right after you asked which medicine — the SAME subject. new_topic false.
+- "yes", "the second one", "before Shabbos please" — answers. SAME subject. new_topic false.
+- "actually forget that, different question — can I use the milchig oven for fish" — a NEW one.
+- A fully-formed second shailah sent on top of an unfinished first — a NEW one.
+- "and while I have you, when is the shiur" — a NEW one.
+Set new_topic true ONLY when they have plainly moved on to a different matter. When they do, put
+the new subject in "question" (or the new intent) and do not carry a word of the old one across.
+If you are unsure, it is the same subject — wrongly starting again loses what they already typed.
+
 STATE MACHINE (you may only move forward along it):
 idle/intent -> collecting_shailah (they want to ask a question) or collecting_booking (call/meeting)
 collecting_shailah -> confirming, once you have their question, your one follow-up answered, and their name if not a known member.
@@ -572,7 +615,7 @@ collecting_booking -> confirming, once a numbered slot is chosen (and their name
 confirming: restate what will be sent/booked and tell them to reply YES.
 
 Reply with STRICT JSON only:
-{"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "complete": false, "confused": false}
+{"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "complete": false, "confused": false, "new_topic": false}
 When you ask a follow-up, fold the answer back into "question" so it reads as one whole shailah for the Rov.
 Only include updates fields you learned THIS turn. slot_index must reference the numbered slots in CONTEXT.`;
 
@@ -580,8 +623,12 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     const priorTurns = history.slice(0, -1);
     let parsed: Record<string, unknown> | null = null;
     try {
+      // Which model answers the kehillah is the single biggest lever on how well this reads, and
+      // it should not need a deploy to pull. Set OPENAI_SMS_MODEL in Settings to try a stronger
+      // one; unset, it stays on the model the app shipped with.
+      const model = (await getSecret("OPENAI_SMS_MODEL"))?.trim() || MODELS.mini;
       const ai = await callOpenAI({
-        model: MODELS.mini,
+        model,
         maxTokens: 500,
         system,
         json: true,
@@ -639,7 +686,15 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     const updates = (parsed.updates ?? {}) as Record<string, unknown>;
     const catSlugs = new Set(ref.cats.map((c) => c.slug));
     const tierSlugs = new Set(ref.tiers.map((t) => t.slug));
-    const newDraft: Draft = { ...draft, confused_turns: confusedTurns };
+    // They have moved on to something else. The model is the only thing that can tell that from
+    // an answer to the question it just asked; code decides what to do about it — the whole of the
+    // old subject goes, and the person stays, because they are still the same person.
+    const hadSubject = Boolean(draft.question || draft.slot_index || draft.purpose);
+    const newTopic = parsed.new_topic === true && hadSubject;
+    const base: Draft = newTopic
+      ? { name: draft.name, rest_notice_sent: draft.rest_notice_sent }
+      : draft;
+    const newDraft: Draft = { ...base, confused_turns: confusedTurns };
     if (typeof updates.question === "string" && updates.question.trim()) newDraft.question = updates.question.trim().slice(0, 3000);
     if (typeof updates.category_slug === "string" && catSlugs.has(updates.category_slug)) newDraft.category_slug = updates.category_slug;
     if (typeof updates.urgency_slug === "string" && tierSlugs.has(updates.urgency_slug)) newDraft.urgency_slug = updates.urgency_slug;

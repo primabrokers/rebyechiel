@@ -22,7 +22,13 @@ const KEYS: { name: string; label: string; hint: string; placeholder: string }[]
     hint: 'Your dedicated TextMagic number. Leave blank to use the account default.' },
   { name: 'OPENAI_API_KEY', label: 'OpenAI key', placeholder: 'sk-…',
     hint: 'Sorting questions, the text-in assistant, the morning briefing, voice notes.' },
+  { name: 'OPENAI_SMS_MODEL', label: 'Model behind the text-in assistant', placeholder: 'gpt-5.4-mini',
+    hint: 'Leave blank for the one it ships with. A stronger model reads people better and costs '
+      + 'more per text. Changed here, the very next text uses it — no rebuild.' },
 ];
+
+/** The model name is not a credential, so it is shown back in full rather than as four characters. */
+const PLAIN = new Set(['TEXTMAGIC_SENDER', 'OPENAI_SMS_MODEL']);
 
 export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | null; say: (m: string) => void }) {
   const [status, setStatus] = useState<Status | null>(null);
@@ -123,7 +129,7 @@ export function ConnectionsPanel({ rabbiPhone, say }: { rabbiPhone: string | nul
               <div className="flex gap-2">
                 <input
                   className={inputCls + ' flex-1 font-mono !text-[13.5px]'}
-                  type={k.name === 'TEXTMAGIC_SENDER' ? 'tel' : 'password'}
+                  type={PLAIN.has(k.name) ? 'text' : 'password'}
                   autoComplete="off" spellCheck={false}
                   placeholder={st?.set ? '•••••••• (leave blank to keep)' : k.placeholder}
                   value={drafts[k.name] ?? ''}
