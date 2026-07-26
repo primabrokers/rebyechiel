@@ -40,6 +40,8 @@ interface Draft {
   purpose?: string;
   // shared
   name?: string;
+  /** One clarifying round has been asked and answered — never ask a second. */
+  clarified?: boolean;
   confused_turns?: number;
   offered_slots?: SlotOut[];
 }
@@ -60,6 +62,13 @@ async function parseInbound(req: Request): Promise<{ from: string; text: string 
   if (!from || !text) return null;
   return { from: normalizePhone(from), text };
 }
+
+/**
+ * Categories the assistant must never probe. A niddah or shalom bayis question is between the
+ * person and the Rov, and a chinuch matter about someone's child is not something to interrogate
+ * by text — take what is offered and let him ask himself, or ring.
+ */
+const NO_PROBE = ["niddah", "shalom_bayis", "chinuch"];
 
 const HANDOFF_TEXT = "No problem — the Rov's assistant will call you to sort this out properly. Thank you for texting.";
 const WELCOME_MENU = "This is Rabbi Yechiel Emanuel's assistant. Reply 1 to ask the Rov a question, 2 to book a phone call, 3 to request a meeting. (This service can't answer questions itself — everything goes to the Rov.)";
@@ -283,14 +292,25 @@ CONVERSATION CONTEXT:
 - shailah categories (slug: name): ${(catQ.data ?? []).map((c) => `${c.slug}: ${c.name}`).join("; ")}
 - urgency tiers (slug: name): ${(tierQ.data ?? []).map((t) => `${t.slug}: ${t.name}`).join("; ")}
 
+ASKING A USEFUL FOLLOW-UP (this is the point of the service):
+The Rov should be able to answer without ringing back. When someone sends a question, ask for the one or two details he would obviously need — in ONE message, plainly, never a list of forms.
+ - medication on a fast: which medicine, and what it is for
+ - a kashrus mix-up: was it hot, and was the pot used that day
+ - Shabbos or yom tov: is it for this coming one
+ - business: roughly what is at stake and whether the other side is Jewish
+ - aveilus: whose, and which day of the aveilus
+NEVER probe on these, whatever they say \u2014 take what is offered and go straight to confirming: ${NO_PROBE.join(", ")}. These are private, or about someone\u2019s child. If something is unclear there, say the Rov may ring rather than asking.
+Set "complete": true when you have enough that the Rov could answer without ringing back, or when the category is one of the never-probe ones.
+
 STATE MACHINE (you may only move forward along it):
 idle/intent -> collecting_shailah (they want to ask a question) or collecting_booking (call/meeting)
-collecting_shailah -> confirming, once you have their question (and their name if not a known member). When they give the question, ask ONE follow-up at most: "How urgent is this?" unless already clear.
+collecting_shailah -> confirming, once you have their question, your one follow-up answered, and their name if not a known member.
 collecting_booking -> confirming, once a numbered slot is chosen (and their name if needed).
 confirming: restate what will be sent/booked and tell them to reply YES.
 
 Reply with STRICT JSON only:
-{"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "confused": false}
+{"reply": "<the SMS to send>", "next_state": "<intent|collecting_shailah|collecting_booking|confirming>", "intent": "<shailah|call|meeting|null>", "updates": {"question": "...", "category_slug": "...", "urgency_slug": "...", "slot_index": <n>, "purpose": "...", "name": "..."}, "complete": false, "confused": false}
+When you ask a follow-up, fold the answer back into "question" so it reads as one whole shailah for the Rov.
 Only include updates fields you learned THIS turn. slot_index must reference the numbered slots in CONTEXT.`;
 
     const ai = await callOpenAI({
@@ -363,7 +383,13 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     // draft but it does not reliably act on it. So the moment we hold everything a shailah or a
     // booking needs, code moves to confirming and writes the confirmation itself.
     const who = profile?.full_name ?? newDraft.name ?? null;
-    const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who);
+    // One clarifying round, then confirm — the assistant may ask what the Rov would ask, but it
+    // may not interrogate. Private and chinuch matters skip the round entirely.
+    const noProbe = NO_PROBE.includes(newDraft.category_slug ?? "");
+    const enoughDetail = noProbe || newDraft.clarified === true || parsed.complete === true;
+    if (intent === "shailah" && newDraft.question && !enoughDetail) newDraft.clarified = true;
+
+    const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who) && enoughDetail;
     const bookingReady = (intent === "call" || intent === "meeting")
       && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who);
 
