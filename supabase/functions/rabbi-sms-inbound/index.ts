@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
       }
       if (lower === "2" || lower === "3") {
         const slotType = lower === "2" ? "call" : "meeting";
-        const slots = (await expandSlots(admin, slotType, tz)).slice(0, MAX_SLOTS_OFFERED);
+        const slots = (await expandSlots(admin, slotType, tz, 60, settings.erev_cutoff_minutes ?? 90)).slice(0, MAX_SLOTS_OFFERED);
         if (!slots.length) {
           return await reply(
             `There are no ${slotType === "call" ? "phone call" : "meeting"} times available just now. The Rov's assistant will be told you asked — or text 1 to send the Rov a question instead.`,
@@ -223,7 +223,7 @@ Deno.serve(async (req: Request) => {
             purpose: draft.purpose ?? null,
           });
           if (result.error === "slot_taken") {
-            const slots = (await expandSlots(admin, slot.slotType, tz)).slice(0, MAX_SLOTS_OFFERED);
+            const slots = (await expandSlots(admin, slot.slotType, tz, 60, settings.erev_cutoff_minutes ?? 90)).slice(0, MAX_SLOTS_OFFERED);
             if (!slots.length) return await reply("Sorry — that time has just been taken and no others are open. The Rov's assistant will call you.", { state: "handed_off" });
             const menu = slots.map((s, i) => `${i + 1}) ${fmtSlot(s.startsAt, tz)}`).join("\n");
             return await reply(`Sorry — that time has just been taken. These are still free:\n${menu}\nReply with the number you'd like.`, {
@@ -332,7 +332,7 @@ Only include updates fields you learned THIS turn. slot_index must reference the
     let replyText = String(parsed.reply).slice(0, 480);
     if (nextState === "collecting_booking" && !newDraft.offered_slots?.length) {
       const slotType = intent === "meeting" ? "meeting" : "call";
-      const slots = (await expandSlots(admin, slotType, tz)).slice(0, MAX_SLOTS_OFFERED);
+      const slots = (await expandSlots(admin, slotType, tz, 60, settings.erev_cutoff_minutes ?? 90)).slice(0, MAX_SLOTS_OFFERED);
       if (!slots.length) {
         return await reply(
           `There are no ${slotType === "call" ? "phone call" : "meeting"} times available just now. The Rov's assistant will be told you asked.`,

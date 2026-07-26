@@ -5,11 +5,13 @@ import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { isDemo } from '../../lib/demo';
 import {
-  fetchAvailability, fetchProfilesByIds, fetchSlotReleases, fetchTimeOff, fetchTimetable,
-  fetchUpcomingBookings,
+  fetchAvailability, fetchCalendar, fetchProfilesByIds, fetchSlotReleases, fetchTimeOff,
+  fetchTimetable, fetchUpcomingBookings,
 } from '../../lib/rabbiData';
-import type { Availability, Booking, Profile, SlotRelease, TimeOff, TimetableBlock } from '../../types';
-import { slotsInWindow } from '../../types';
+import type {
+  Availability, Booking, CalendarDay, Profile, SlotRelease, TimeOff, TimetableBlock,
+} from '../../types';
+import { ZMANIM_SHOWN, slotsInWindow } from '../../types';
 import { Btn, Field, Panel, Portal, Spinner, Toast, inputCls } from '../shared/ui';
 import { whoOf } from '../../lib/present';
 import { OpenTimesSheet } from './OpenTimesSheet';
@@ -44,6 +46,7 @@ export function DiaryPage() {
   const [releases, setReleases] = useState<SlotRelease[]>([]);
   const [weekly, setWeekly] = useState<Availability[]>([]);
   const [daysOff, setDaysOff] = useState<TimeOff[]>([]);
+  const [calendar, setCalendar] = useState<Map<string, CalendarDay>>(new Map());
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
   const [sheet, setSheet] = useState<null | 'release' | 'block'>(null);
@@ -52,10 +55,12 @@ export function DiaryPage() {
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3200); };
 
   const load = async () => {
-    const [t, r, b, a, o] = await Promise.all([
+    const week = startOfWeek(new Date(), { weekStartsOn: 0 });
+    const [t, r, b, a, o, c] = await Promise.all([
       fetchTimetable(), fetchSlotReleases(), fetchUpcomingBookings(14), fetchAvailability(), fetchTimeOff(),
+      fetchCalendar(format(week, 'yyyy-MM-dd'), format(addDays(week, 6), 'yyyy-MM-dd')),
     ]);
-    setBlocks(t); setReleases(r); setBookings(b); setWeekly(a); setDaysOff(o);
+    setBlocks(t); setReleases(r); setBookings(b); setWeekly(a); setDaysOff(o); setCalendar(c);
     setProfiles(await fetchProfilesByIds(b.map((x) => x.profile_id).filter(Boolean) as string[]));
     setLoading(false);
   };
@@ -93,7 +98,7 @@ export function DiaryPage() {
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-[13px] text-ink-muted">
           Grey is your fixed week. Dashed indigo is open to book. Solid indigo is someone who booked you.
-          Shabbos is never shown — nothing is ever placed on it.
+          Shabbos and yom tov are shaded — nothing is ever offered on them, or promised for them.
         </span>
         <div className="ml-auto flex gap-2">
           <Btn onClick={() => setSheet('block')}>Add to my week</Btn>
@@ -104,17 +109,33 @@ export function DiaryPage() {
       <WeeklyTimes weekly={weekly} daysOff={daysOff} releases={releases}
         onStop={stopWeekly} onComeBack={comeBack} onAdd={() => setSheet('release')} />
 
+      <Zmanim day={calendar.get(format(new Date(), 'yyyy-MM-dd'))} />
+
       <Panel className="overflow-hidden">
         <div className="grid grid-cols-[62px_repeat(6,1fr)] border-b">
           <div />
-          {days.map((d) => (
-            <div key={d.toISOString()} className="py-3 px-2.5 text-center border-l border-hair">
-              <div className={clsx('text-[12.5px] font-extrabold', d.getDay() === today ? 'text-indigo' : 'text-ink')}>
-                {format(d, 'EEE')}
+          {days.map((d) => {
+            const cal = calendar.get(format(d, 'yyyy-MM-dd'));
+            return (
+              <div key={d.toISOString()} className="py-3 px-2.5 text-center border-l border-hair">
+                <div className={clsx('text-[12.5px] font-extrabold', d.getDay() === today ? 'text-indigo' : 'text-ink')}>
+                  {format(d, 'EEE')}
+                </div>
+                <div className="font-mono text-[11px] font-medium text-ink-faint">{format(d, 'd')}</div>
+                {cal?.label && (
+                  <div className={clsx('mt-1 text-[10.5px] font-bold leading-tight truncate',
+                    cal.no_work ? 'text-warn' : 'text-ink-muted')} title={cal.label}>
+                    {cal.label}
+                  </div>
+                )}
+                {cal?.candles_at && (
+                  <div className="font-mono text-[10px] text-warn" title="Candle lighting">
+                    ✦ {format(new Date(cal.candles_at), 'HH:mm')}
+                  </div>
+                )}
               </div>
-              <div className="font-mono text-[11px] font-medium text-ink-faint">{format(d, 'd')}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="relative grid grid-cols-[62px_repeat(6,1fr)] overflow-x-auto"
@@ -133,9 +154,12 @@ export function DiaryPage() {
             const dayBlocks = blocks.filter((b) => b.weekday === wd);
             const dayReleases = releases.filter((r) => r.status === 'open' && new Date(r.starts_at).getDay() === wd);
             const dayBookings = bookings.filter((b) => new Date(b.starts_at).toDateString() === d.toDateString());
+            const cal = calendar.get(format(d, 'yyyy-MM-dd'));
+            const rest = Boolean(cal?.no_work);
             return (
               <div key={d.toISOString()}
-                className={clsx('relative border-l border-hair', wd === today ? 'bg-subtle' : 'bg-surface')}>
+                className={clsx('relative border-l border-hair',
+                  rest ? 'bg-warn-bg/50' : wd === today ? 'bg-subtle' : 'bg-surface')}>
                 {HOURS.map((h) => <div key={h} style={{ height: ROW_H }} className="border-t border-hair" />)}
 
                 {dayBlocks.map((b) => (
@@ -144,13 +168,13 @@ export function DiaryPage() {
                     label={b.label} time={`${b.start_time.slice(0, 5)}–${b.end_time.slice(0, 5)}`}
                     onRemove={() => remove('rabbi_timetable_blocks', b.id)} />
                 ))}
-                {weekly.filter((a) => a.weekday === wd).map((a) => (
+                {!rest && weekly.filter((a) => a.weekday === wd).map((a) => (
                   <Event key={a.id} variant="open" top={toPx(minutesFrom(a.start_time.slice(0, 5)))}
                     height={toPx(minutesFrom(a.end_time.slice(0, 5)) - minutesFrom(a.start_time.slice(0, 5)))}
                     label={`${slotsInWindow(a)} ${a.slot_type === 'call' ? 'calls' : 'meetings'} open`}
                     time={`every week · ${a.duration_minutes}m each`} />
                 ))}
-                {dayReleases.map((r) => (
+                {!rest && dayReleases.map((r) => (
                   <Event key={r.id} variant="open" top={toPx(minutesFrom(format(new Date(r.starts_at), 'HH:mm')))}
                     height={toPx((Date.parse(r.ends_at) - Date.parse(r.starts_at)) / 60000)}
                     label={r.slot_type === 'call' ? 'Extra calls' : 'Extra meetings'}
@@ -208,6 +232,35 @@ function Event({ top, height, label, time, variant = 'fixed', onRemove }: {
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+/**
+ * Today's zmanim, from Hebcal for the configured place. A quiet strip rather than a panel: he
+ * glances at it, he does not work from it, and it must never compete with what needs him.
+ */
+function Zmanim({ day }: { day?: CalendarDay }) {
+  if (!day?.zmanim) return null;
+  const times = ZMANIM_SHOWN.filter((z) => day.zmanim?.[z.key]);
+  if (!times.length) return null;
+  return (
+    <Panel className="px-5 py-3.5 flex items-center gap-x-5 gap-y-2 flex-wrap">
+      <span className="text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-ink-muted flex-none">
+        Zmanim today{day.hebrew_date ? ` · ${day.hebrew_date}` : ''}
+      </span>
+      {times.map((z) => (
+        <span key={z.key} className="flex items-baseline gap-1.5">
+          <span className="text-[11.5px] text-ink-muted">{z.label}</span>
+          <span className="font-mono text-[12px] font-semibold">{format(new Date(day.zmanim![z.key]), 'HH:mm')}</span>
+        </span>
+      ))}
+      {day.candles_at && (
+        <span className="flex items-baseline gap-1.5 text-warn">
+          <span className="text-[11.5px] font-bold">✦ Candles</span>
+          <span className="font-mono text-[12px] font-bold">{format(new Date(day.candles_at), 'HH:mm')}</span>
+        </span>
+      )}
+    </Panel>
+  );
+}
 
 /**
  * The times he keeps every week, in plain sentences with the count that matters — this is what

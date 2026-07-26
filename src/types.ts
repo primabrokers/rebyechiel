@@ -145,6 +145,16 @@ export function slotsInWindow(a: Pick<Availability, 'start_time' | 'end_time' | 
 
 export interface Settings {
   id: number;
+  /** Where candle-lighting and zmanim are calculated for. Any Hebcal geonameid works. */
+  location_name: string;
+  location_geonameid: number;
+  location_latitude: number;
+  location_longitude: number;
+  /** Two days of yom tov outside Israel, one inside. */
+  in_israel: boolean;
+  /** How long before candle-lighting the diary stops offering appointments. */
+  erev_cutoff_minutes: number;
+  calendar_synced_at: string | null;
   timezone: string;
   daily_shailah_capacity: number;
   same_day_cutoff_hour: number;
@@ -187,4 +197,44 @@ export interface Invitation {
   decline_reason: string | null;
   responded_at: string | null;
   created_at: string;
+}
+
+export type DayKind = 'weekday' | 'erev' | 'shabbos' | 'yomtov' | 'chol_hamoed' | 'fast';
+
+/**
+ * One day of the Jewish calendar, from Hebcal, for the configured location. Cached nightly —
+ * see supabase/functions/rabbi-calendar.
+ */
+export interface CalendarDay {
+  on_date: string;
+  kind: DayKind;
+  label: string | null;
+  parsha: string | null;
+  /** Work is forbidden: nothing is promised for, offered on, or texted on this day. */
+  no_work: boolean;
+  candles_at: string | null;
+  havdalah_at: string | null;
+  zmanim: Record<string, string> | null;
+  hebrew_date: string | null;
+}
+
+/** The zmanim worth showing him, in the order he would read them, with plain names. */
+export const ZMANIM_SHOWN: { key: string; label: string }[] = [
+  { key: 'alotHaShachar', label: 'Alos' },
+  { key: 'misheyakir', label: 'Misheyakir' },
+  { key: 'sunrise', label: 'Netz' },
+  { key: 'sofZmanShma', label: 'Sof zman krias shma' },
+  { key: 'sofZmanTfilla', label: 'Sof zman tefilla' },
+  { key: 'chatzot', label: 'Chatzos' },
+  { key: 'minchaGedola', label: 'Mincha gedola' },
+  { key: 'plagHaMincha', label: 'Plag' },
+  { key: 'sunset', label: 'Shkia' },
+  { key: 'tzeit7083deg', label: 'Tzeis' },
+];
+
+/** How a day should read on screen — yom tov beats Shabbos beats erev. */
+export function dayTone(kind: DayKind): 'plain' | 'rest' | 'soft' {
+  return kind === 'yomtov' || kind === 'shabbos' ? 'rest'
+    : kind === 'erev' || kind === 'chol_hamoed' || kind === 'fast' ? 'soft'
+      : 'plain';
 }

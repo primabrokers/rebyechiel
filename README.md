@@ -106,8 +106,14 @@ A banner sits above every screen so it cannot be mistaken for real data.
   on top, for a genuinely extra hour. Shabbos, his fixed timetable, and anything already booked
   are subtracted from the result — so a slot is only ever offered if it is really free.
 - Reply promises are deterministic (`_shared/rabbiEta.ts`): same-day categories (niddah) with a
-  configurable cutoff, hour-based and queue-based tiers, and nothing is ever promised or sent on
-  Shabbos (proper yom tov calendar is a planned follow-up).
+  configurable cutoff, hour-based and queue-based tiers. Nothing is promised for Shabbos or yom
+  tov, and a same-day promise is pulled back to before candle-lighting rather than left at 22:00
+  on an erev — a promise he could not keep is worse than a later one.
+- The Jewish calendar comes from Hebcal, cached nightly into `rabbi_calendar_days` by the
+  `rabbi-calendar` function: yom tov, chol hamoed, fasts, parsha, candle-lighting, havdalah, and
+  a fortnight of zmanim. The location lives in `rabbi_settings` (Manchester by default, any
+  Hebcal geonameid) and changing it in Settings re-fetches immediately. `expandSlots()` drops
+  yom tov entirely and stops offering appointments a configurable while before candles.
 - Sensitive categories (niddah, shalom bayis) are masked in every list, excluded from SMS
   content, and invisible to the `assistant` role at the RLS layer.
 - The SMS bot is a deterministic state machine; the model only interprets and drafts. It never

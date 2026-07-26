@@ -9,8 +9,8 @@
 // sticks for the browser tab, so navigating around keeps you in preview.
 
 import type {
-  Availability, Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimeOff,
-  TimetableBlock, UrgencyTier,
+  Availability, Booking, CalendarDay, Category, Invitation, Profile, Settings, Shailah,
+  SlotRelease, TimeOff, TimetableBlock, UrgencyTier,
 } from '../types';
 
 export type DemoRole = 'rabbi' | 'member';
@@ -252,6 +252,9 @@ export function demoSlots(slotType: 'call' | 'meeting') {
 
 export const demoSettings: Settings = {
   id: 1, timezone: 'Europe/London', daily_shailah_capacity: 10,
+  location_name: 'Manchester, United Kingdom', location_geonameid: 2643123,
+  location_latitude: 53.48102, location_longitude: -2.23679,
+  in_israel: false, erev_cutoff_minutes: 90, calendar_synced_at: hoursFromNow(-4),
   same_day_cutoff_hour: 15, same_day_promise_hour: 22,
   calls_auto_confirm: true, meetings_auto_confirm: false,
   sms_notifications_enabled: true, briefing_enabled: true, rabbi_phone: '+447700900001',
@@ -289,3 +292,39 @@ export const demoInvitations: Invitation[] = [
     status: 'accepted', decline_reason: null, responded_at: daysAgo(0), created_at: daysAgo(3),
   },
 ];
+
+/**
+ * A fortnight of the Jewish calendar, as Hebcal would return it for Manchester — enough for the
+ * diary to show a Shabbos, an erev with candle-lighting, and a day of zmanim.
+ */
+function dateKey(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export const demoCalendar: CalendarDay[] = Array.from({ length: 21 }, (_, i): CalendarDay => {
+  const on_date = dateKey(i);
+  const wd = new Date(`${on_date}T12:00:00`).getDay();
+  const at = (h: number, m: number) => new Date(`${on_date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`).toISOString();
+  if (wd === 6) {
+    return {
+      on_date, kind: 'shabbos', label: 'Shabbos Eikev', parsha: 'Eikev', no_work: true,
+      candles_at: null, havdalah_at: at(22, 4), zmanim: null, hebrew_date: null,
+    };
+  }
+  if (wd === 5) {
+    return {
+      on_date, kind: 'erev', label: 'Erev Shabbos', parsha: null, no_work: false,
+      candles_at: at(20, 44), havdalah_at: null,
+      zmanim: i < 14 ? { alotHaShachar: at(3, 2), sunrise: at(5, 20), sofZmanShma: at(9, 27), chatzot: at(13, 21), sunset: at(21, 22), tzeit7083deg: at(22, 4) } : null,
+      hebrew_date: null,
+    };
+  }
+  return {
+    on_date, kind: 'weekday', label: null, parsha: null, no_work: false,
+    candles_at: null, havdalah_at: null,
+    zmanim: i < 14 ? { alotHaShachar: at(3, 4), misheyakir: at(4, 12), sunrise: at(5, 22), sofZmanShma: at(9, 28), sofZmanTfilla: at(10, 45), chatzot: at(13, 21), minchaGedola: at(13, 56), plagHaMincha: at(19, 30), sunset: at(21, 20), tzeit7083deg: at(22, 2) } : null,
+    hebrew_date: null,
+  };
+});

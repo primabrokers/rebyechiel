@@ -1,12 +1,12 @@
 import { supabase } from './supabase';
 import {
-  demoAnswered, demoAvailability, demoBookings, demoBriefing, demoCategories, demoHandedOff,
+  demoAnswered, demoAvailability, demoBookings, demoBriefing, demoCalendar, demoCategories, demoHandedOff,
   demoInvitations, demoProfiles, demoQueue, demoSettings, demoSlotReleases, demoTimeOff,
   demoTimetable, demoTiers, isDemo,
 } from './demo';
 import type {
-  Availability, Booking, Category, Invitation, Profile, Settings, Shailah, SlotRelease, TimeOff,
-  TimetableBlock, UrgencyTier,
+  Availability, Booking, CalendarDay, Category, Invitation, Profile, Settings, Shailah,
+  SlotRelease, TimeOff, TimetableBlock, UrgencyTier,
 } from '../types';
 
 // Direct table reads/writes for the admin side — all under the rabbi_is_admin() RLS policies.
@@ -114,6 +114,15 @@ export async function fetchTimeOff(): Promise<TimeOff[]> {
   const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const { data } = await supabase.from('rabbi_time_off').select('*').gte('on_date', key).order('on_date');
   return (data as TimeOff[]) ?? [];
+}
+
+/** The Jewish calendar for a window of dates — yom tov, candle-lighting, zmanim. */
+export async function fetchCalendar(fromDate: string, toDate: string): Promise<Map<string, CalendarDay>> {
+  const rows = isDemo()
+    ? demoCalendar.filter((d) => d.on_date >= fromDate && d.on_date <= toDate)
+    : ((await supabase.from('rabbi_calendar_days').select('*')
+        .gte('on_date', fromDate).lte('on_date', toDate).order('on_date')).data as CalendarDay[]) ?? [];
+  return new Map(rows.map((d) => [d.on_date, d]));
 }
 
 export async function fetchSettings(): Promise<Settings | null> {

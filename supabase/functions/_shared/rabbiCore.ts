@@ -5,10 +5,11 @@
 // same confirmations — so the logic lives here rather than in either function.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
-import { atLocalTime, computeEta, localParts } from "./rabbiEta.ts";
+import { atLocalTime, computeEta, localDateKey, localParts } from "./rabbiEta.ts";
 
 export interface RabbiSettings {
   timezone: string;
+  erev_cutoff_minutes?: number;
   daily_shailah_capacity: number;
   same_day_cutoff_hour: number;
   same_day_promise_hour: number;
@@ -19,10 +20,31 @@ export interface RabbiSettings {
   rabbi_phone: string | null;
 }
 
+/**
+ * Every Shabbos and yom tov in the next `days`, as yyyy-mm-dd. Fed to computeEta so a promise
+ * never lands on a day the Rov cannot answer. An empty set (calendar not synced yet) degrades
+ * to the old behaviour: Saturday only.
+ */
+export async function loadNoWorkDates(
+  admin: SupabaseClient, tz: string, days = 45,
+): Promise<{ noWorkDates: Set<string>; candleTimes: Map<string, string> }> {
+  const from = localDateKey(new Date(), tz);
+  const to = localDateKey(new Date(Date.now() + days * 86_400_000), tz);
+  const { data } = await admin.from("rabbi_calendar_days")
+    .select("on_date, no_work, candles_at").gte("on_date", from).lte("on_date", to);
+  const noWorkDates = new Set<string>();
+  const candleTimes = new Map<string, string>();
+  for (const d of data ?? []) {
+    if (d.no_work) noWorkDates.add(String(d.on_date));
+    if (d.candles_at) candleTimes.set(String(d.on_date), String(d.candles_at));
+  }
+  return { noWorkDates, candleTimes };
+}
+
 export async function loadRabbiSettings(admin: SupabaseClient): Promise<RabbiSettings> {
   const { data } = await admin.from("rabbi_settings").select("*").eq("id", 1).maybeSingle();
   return (data as RabbiSettings | null) ?? {
-    timezone: "Europe/London", daily_shailah_capacity: 10, same_day_cutoff_hour: 15,
+    timezone: "Europe/London", erev_cutoff_minutes: 90, daily_shailah_capacity: 10, same_day_cutoff_hour: 15,
     same_day_promise_hour: 22, calls_auto_confirm: true, meetings_auto_confirm: false,
     sms_notifications_enabled: true, briefing_enabled: true, rabbi_phone: null,
   };
@@ -66,22 +88,20 @@ const hhmm = (t: string): [number, number] => {
   return [h || 0, m || 0];
 };
 
-/** yyyy-mm-dd of an instant in the Rov's timezone — how a day off is matched. */
-function localDateKey(d: Date, tz: string): string {
-  const p = localParts(d, tz);
-  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
-}
+/** Kept separate so the cutoff check can name the day before the rest of the loop runs. */
+const slotStartOf = (ms: number) => new Date(ms);
 
 export async function expandSlots(
   admin: SupabaseClient,
   slotType: "call" | "meeting",
   tz: string,
   limit = 60,
+  erevCutoffMinutes = 90,
 ): Promise<SlotOut[]> {
   const now = new Date();
   const nowIso = now.toISOString();
   const horizon = new Date(Date.now() + HORIZON_DAYS * 86_400_000).toISOString();
-  const [releasesQ, weeklyQ, bookingsQ, blocksQ, offQ] = await Promise.all([
+  const [releasesQ, weeklyQ, bookingsQ, blocksQ, offQ, calQ] = await Promise.all([
     admin.from("rabbi_slot_releases").select("*")
       .eq("slot_type", slotType).eq("status", "open")
       .gt("ends_at", nowIso).lt("starts_at", horizon)
@@ -91,10 +111,23 @@ export async function expandSlots(
       .in("status", ["requested", "confirmed"]).gt("ends_at", nowIso),
     admin.from("rabbi_timetable_blocks").select("weekday, start_time, end_time").eq("is_active", true),
     admin.from("rabbi_time_off").select("on_date").gte("on_date", localDateKey(now, tz)),
+    admin.from("rabbi_calendar_days").select("on_date, no_work, candles_at")
+      .gte("on_date", localDateKey(now, tz))
+      .lte("on_date", localDateKey(new Date(Date.now() + HORIZON_DAYS * 86_400_000), tz)),
   ]);
   const bookings = (bookingsQ.data ?? []).map((b) => ({ s: Date.parse(b.starts_at), e: Date.parse(b.ends_at) }));
   const blocks = blocksQ.data ?? [];
   const daysOff = new Set((offQ.data ?? []).map((d) => String(d.on_date)));
+  // Yom tov and Shabbos are closed outright; on an erev, appointments stop a configurable
+  // while before candle-lighting so nobody is booked into the run-up.
+  const closed = new Set<string>();
+  const lastBookableMs = new Map<string, number>();
+  const cutoffMs = erevCutoffMinutes * 60_000;
+  for (const c of calQ.data ?? []) {
+    const date = String(c.on_date);
+    if (c.no_work) closed.add(date);
+    if (c.candles_at) lastBookableMs.set(date, Date.parse(String(c.candles_at)) - cutoffMs);
+  }
 
   // The weekly pattern, projected onto real dates, plus any one-off releases. A release on the
   // same day as the pattern is an addition, not a replacement — overlapping starts are deduped
@@ -114,8 +147,10 @@ export async function expandSlots(
   for (let day = 0; day <= HORIZON_DAYS; day++) {
     const probe = new Date(now.getTime() + day * 86_400_000);
     const p = localParts(probe, tz);
+    const key = localDateKey(probe, tz);
     if (p.weekday === 6) continue;                             // never Shabbos
-    if (daysOff.has(localDateKey(probe, tz))) continue;        // he told us he's away
+    if (closed.has(key)) continue;                             // yom tov, per Hebcal
+    if (daysOff.has(key)) continue;                            // he told us he's away
     for (const a of weeklyQ.data ?? []) {
       if ((a.weekday as number) !== p.weekday) continue;
       const [sh, sm] = hhmm(a.start_time as string);
@@ -140,6 +175,10 @@ export async function expandSlots(
       const e = s + dur;
       if (s < Date.now() + MIN_NOTICE_MS) continue;
       if (seen.has(s)) continue;                                  // two windows, same minute
+      const dayKey = localDateKey(slotStartOf(s), tz);
+      if (closed.has(dayKey)) continue;                           // a one-off release on yom tov
+      const latest = lastBookableMs.get(dayKey);
+      if (latest !== undefined && e > latest) continue;           // into the erev run-up
       if (bookings.some((b) => s < b.e && e > b.s)) continue;
       const slotStart = new Date(s);
       const wd = localParts(slotStart, tz).weekday;
@@ -194,7 +233,7 @@ export async function createShailah(
   settings: RabbiSettings,
   input: CreateShailahInput,
 ): Promise<{ shailah?: CreatedShailah; error?: string }> {
-  const [{ data: category }, { data: tier }, { count: queueAhead }] = await Promise.all([
+  const [{ data: category }, { data: tier }, { count: queueAhead }, calendar] = await Promise.all([
     input.categoryId
       ? admin.from("rabbi_categories").select("id, default_same_day, is_sensitive").eq("id", input.categoryId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -203,10 +242,13 @@ export async function createShailah(
       : Promise.resolve({ data: null }),
     admin.from("rabbi_shailos").select("id", { count: "exact", head: true })
       .in("status", ["new", "triaged", "in_progress"]),
+    loadNoWorkDates(admin, settings.timezone),
   ]);
 
   const eta = computeEta({
     now: new Date(),
+    noWorkDates: calendar.noWorkDates,
+    candleTimes: calendar.candleTimes,
     tier: {
       promiseType: (tier?.promise_type ?? "queue_based") as "same_day" | "hours" | "queue_based",
       promiseHours: tier?.promise_hours ?? null,
@@ -253,7 +295,7 @@ export async function createBooking(
   // deno-lint-ignore no-explicit-any
 ): Promise<{ booking?: any; autoConfirmed?: boolean; error?: string }> {
   // Re-expand to confirm the slot is still genuinely free (race-safe enough for one rabbi).
-  const fresh = await expandSlots(admin, input.slot.slotType, settings.timezone);
+  const fresh = await expandSlots(admin, input.slot.slotType, settings.timezone, 60, settings.erev_cutoff_minutes ?? 90);
   const stillFree = fresh.some((s) => s.releaseId === input.slot.releaseId && s.startsAt === input.slot.startsAt);
   if (!stillFree) return { error: "slot_taken" };
 

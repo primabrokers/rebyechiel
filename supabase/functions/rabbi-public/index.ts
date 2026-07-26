@@ -5,7 +5,7 @@ import { computeEta } from "../_shared/rabbiEta.ts";
 import { sendRabbiMessage } from "../_shared/rabbiMessaging.ts";
 import { normalizePhone } from "../_shared/textmagic.ts";
 import {
-  createBooking, createShailah, expandSlots, fireTriage, fmtSlot, loadRabbiSettings,
+  createBooking, createShailah, expandSlots, fireTriage, fmtSlot, loadNoWorkDates, loadRabbiSettings,
 } from "../_shared/rabbiCore.ts";
 
 /**
@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
 
       case "slots": {
         const slotType = body.slotType === "meeting" ? "meeting" : "call";
-        const slots = await expandSlots(admin, slotType, settings.timezone);
+        const slots = await expandSlots(admin, slotType, settings.timezone, 60, settings.erev_cutoff_minutes ?? 90);
         return json({ slots });
       }
 
@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
         const startsAt = String(body.startsAt ?? "");
         const releaseId = String(body.releaseId ?? "");
         if (!startsAt || !releaseId) return json({ error: "releaseId and startsAt required" }, 400);
-        const slots = await expandSlots(admin, slotType, settings.timezone);
+        const slots = await expandSlots(admin, slotType, settings.timezone, 60, settings.erev_cutoff_minutes ?? 90);
         const slot = slots.find((s) => s.releaseId === releaseId && s.startsAt === startsAt);
         if (!slot) return json({ error: "slot_taken" }, 409);
 
@@ -215,14 +215,17 @@ Deno.serve(async (req: Request) => {
 
         const categoryId = body.categoryId ? String(body.categoryId) : null;
         const urgencyTierId = body.urgencyTierId ? String(body.urgencyTierId) : null;
-        const [{ data: category }, { data: tier }, { count: queueAhead }] = await Promise.all([
+        const [{ data: category }, { data: tier }, { count: queueAhead }, calendar] = await Promise.all([
           categoryId ? admin.from("rabbi_categories").select("id, default_same_day, is_sensitive").eq("id", categoryId).maybeSingle() : Promise.resolve({ data: null }),
           urgencyTierId ? admin.from("rabbi_urgency_tiers").select("id, promise_type, promise_hours").eq("id", urgencyTierId).maybeSingle() : Promise.resolve({ data: null }),
           admin.from("rabbi_shailos").select("id", { count: "exact", head: true }).in("status", ["new", "triaged", "in_progress"]),
+          loadNoWorkDates(admin, settings.timezone),
         ]);
         // Recompute from the ORIGINAL submission time so re-triage never quietly extends a promise.
         const eta = computeEta({
           now: new Date(row.created_at),
+          noWorkDates: calendar.noWorkDates,
+          candleTimes: calendar.candleTimes,
           tier: {
             promiseType: (tier?.promise_type ?? "queue_based") as "same_day" | "hours" | "queue_based",
             promiseHours: tier?.promise_hours ?? null,

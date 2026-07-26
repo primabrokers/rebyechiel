@@ -5,18 +5,31 @@ import { isDemo } from '../../lib/demo';
 import { fetchCategories, fetchProfilesByIds, fetchSettings } from '../../lib/rabbiData';
 import type { Category, Settings } from '../../types';
 import { Btn, Field, Panel, Spinner, Toast, Toggle, inputCls } from '../shared/ui';
+import { format } from 'date-fns';
 import { useAuth } from '../../lib/auth';
 
 /**
  * Plain switches in plain words. Every change saves itself and says so — there is no Save button
  * to forget, and nothing here can lose a question.
  */
+/**
+ * The places this kehillah is likely to need. Each is a Hebcal geonameid — anywhere else can be
+ * added here, or set directly in rabbi_settings if the Rov ever moves somewhere unlisted.
+ */
+const PLACES = [
+  { name: 'Manchester, United Kingdom', geonameid: 2643123, lat: 53.48102, lon: -2.23679, israel: false },
+  { name: 'London, United Kingdom', geonameid: 2643743, lat: 51.50853, lon: -0.12574, israel: false },
+  { name: 'Gateshead, United Kingdom', geonameid: 2648579, lat: 54.96209, lon: -1.60168, israel: false },
+  { name: 'Jerusalem, Israel', geonameid: 281184, lat: 31.76904, lon: 35.21633, israel: true },
+];
+
 export function SettingsPage() {
   const { profile, signOut } = useAuth();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [cats, setCats] = useState<Category[]>([]);
   const [helpers, setHelpers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2600); };
 
@@ -43,6 +56,26 @@ export function SettingsPage() {
     setCats(cats.map((x) => x.id === c.id ? { ...x, is_active: !c.is_active } : x));
     if (!isDemo()) await supabase.from('rabbi_categories').update({ is_active: !c.is_active }).eq('id', c.id);
     say(c.is_active === false ? `${c.name} is back on the list.` : `${c.name} is off the list — nothing already asked is lost.`);
+  };
+
+  /** Changing the place re-fetches the whole calendar, so it can never disagree with itself. */
+  const setPlace = async (pl: typeof PLACES[number]) => {
+    await patch({
+      location_name: pl.name, location_geonameid: pl.geonameid,
+      location_latitude: pl.lat, location_longitude: pl.lon, in_israel: pl.israel,
+    }, `Now working to ${pl.name}. Fetching the calendar…`);
+    await syncCalendar();
+  };
+
+  const syncCalendar = async () => {
+    if (isDemo()) { say('Calendar refreshed.'); return; }
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('rabbi-calendar');
+      if (error || data?.error) { say("Couldn't reach the calendar service — it will try again tonight."); return; }
+      setSettings((s) => (s ? { ...s, calendar_synced_at: new Date().toISOString() } : s));
+      say(`Calendar updated — ${data?.days ?? 0} days for ${data?.location ?? 'your area'}.`);
+    } finally { setSyncing(false); }
   };
 
   const toggles: { key: keyof Settings; label: string; hint: string }[] = [
@@ -114,6 +147,40 @@ export function SettingsPage() {
               No helper accounts yet
             </span>
           )}
+        </div>
+      </Panel>
+
+      <Panel className="p-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-[15px] font-extrabold tracking-tight">Where you are</span>
+          <span className="text-[12.5px] leading-snug text-ink-muted">
+            Candle-lighting, yom tov and the zmanim are worked out for this place. Change it and the
+            calendar is fetched again straight away.
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {PLACES.map((pl) => (
+            <button key={pl.geonameid}
+              onClick={() => setPlace(pl)}
+              className={clsx('rounded-md px-3.5 py-3 text-left border-[1.5px] transition-colors flex items-center gap-3',
+                settings.location_geonameid === pl.geonameid ? 'border-graphite bg-subtle' : 'border-[rgba(16,19,24,.11)] bg-surface')}>
+              <div className="flex-1 flex flex-col gap-px">
+                <span className="text-[14px] font-extrabold">{pl.name}</span>
+                <span className="font-mono text-[11px] text-ink-muted">
+                  {pl.lat.toFixed(3)}, {pl.lon.toFixed(3)}{pl.israel ? ' · one day yom tov' : ''}
+                </span>
+              </div>
+              {settings.location_geonameid === pl.geonameid && <span className="text-[15px] font-extrabold">✓</span>}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-[12px] text-ink-muted">
+            {settings.calendar_synced_at
+              ? `Calendar last fetched ${format(new Date(settings.calendar_synced_at), 'd MMM, HH:mm')}.`
+              : 'The calendar has not been fetched yet.'}
+          </span>
+          <Btn className="ml-auto" busy={syncing} onClick={syncCalendar}>Fetch it again</Btn>
         </div>
       </Panel>
 

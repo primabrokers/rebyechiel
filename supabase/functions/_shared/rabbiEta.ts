@@ -4,8 +4,9 @@
 // Tuesday evening") must be reproducible and auditable, so no AI is involved here. The AI only
 // suggests WHICH tier applies; this module turns a tier into a date and a sentence.
 //
-// Promises never land on Shabbos: anything that would fall on a Saturday rolls to Sunday.
-// (Proper yom tov / zmanim awareness is a planned follow-up; Saturday is the hard floor.)
+// Promises never land on a day of rest: anything falling on Shabbos or yom tov rolls forward to
+// the next day he can actually answer. Saturday is the hard floor even with no calendar loaded;
+// yom tov comes from rabbi_calendar_days (Hebcal), passed in as `noWorkDates`.
 
 export interface EtaSettings {
   timezone: string; // e.g. 'Europe/London'
@@ -77,10 +78,47 @@ export function atLocalHour(base: Date, tz: string, dayOffset: number, hour: num
   return atLocalTime(base, tz, dayOffset, hour, 0);
 }
 
-function rollOffShabbos(due: Date, tz: string, promiseHour: number): Date {
+/** yyyy-mm-dd of an instant in the Rov's timezone — the key rabbi_calendar_days is stored by. */
+export function localDateKey(d: Date, tz: string): string {
+  const p = localParts(d, tz);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** How long before candle-lighting a same-day promise must land, so it is actually keepable. */
+const BEFORE_CANDLES_MS = 30 * 60_000;
+
+/**
+ * Walk a promise forward off Shabbos and yom tov, and pull it back before candle-lighting on an
+ * erev. The promise hour is 22:00 by default — on erev Shabbos in December that is four hours
+ * after the Rov has stopped, so "by this evening" would be a promise he could not keep.
+ *
+ * Bounded at 14 hops so a bad calendar can never spin: eight days of Sukkos with a Shabbos
+ * either side is the worst real case.
+ */
+function rollOffRestDays(
+  due: Date, now: Date, tz: string, promiseHour: number,
+  noWork?: Set<string>, candles?: Map<string, string>,
+): Date {
   let result = due;
-  while (localParts(result, tz).weekday === 6) {
-    result = atLocalHour(result, tz, 1, promiseHour);
+  for (let i = 0; i < 14; i++) {
+    const key = localDateKey(result, tz);
+    const isShabbos = localParts(result, tz).weekday === 6;
+    const isYomTov = noWork?.has(key) ?? false;
+    if (isShabbos || isYomTov) {
+      result = atLocalHour(result, tz, 1, promiseHour);
+      continue;
+    }
+    const candlesAt = candles?.get(key);
+    if (candlesAt) {
+      const deadline = Date.parse(candlesAt) - BEFORE_CANDLES_MS;
+      if (result.getTime() > deadline) {
+        // Before candles if there is still time today; otherwise it waits for after Shabbos.
+        if (deadline > now.getTime()) return new Date(deadline);
+        result = atLocalHour(result, tz, 1, promiseHour);
+        continue;
+      }
+    }
+    break;
   }
   return result;
 }
@@ -104,8 +142,12 @@ export function computeEta(opts: {
   categorySameDay: boolean;
   queueAhead: number; // open shailos already in the queue
   settings: EtaSettings;
+  /** yyyy-mm-dd of every Shabbos/yom tov ahead, from rabbi_calendar_days. */
+  noWorkDates?: Set<string>;
+  /** yyyy-mm-dd → candle-lighting ISO time, so a promise never lands after candles. */
+  candleTimes?: Map<string, string>;
 }): EtaResult {
-  const { now, tier, categorySameDay, queueAhead, settings } = opts;
+  const { now, tier, categorySameDay, queueAhead, settings, noWorkDates, candleTimes } = opts;
   const tz = settings.timezone;
   const promiseHour = settings.sameDayPromiseHour;
   let due: Date;
@@ -123,6 +165,6 @@ export function computeEta(opts: {
     due = atLocalHour(now, tz, days, promiseHour);
   }
 
-  due = rollOffShabbos(due, tz, promiseHour);
+  due = rollOffRestDays(due, now, tz, promiseHour, noWorkDates, candleTimes);
   return { dueAt: due, humanText: `The Rov expects to answer ${describeDay(due, now, tz)}.` };
 }
