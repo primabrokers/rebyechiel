@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
         }
         const menu = slots.map((s, i) => `${i + 1}) ${fmtSlot(s.startsAt, tz)}`).join("\n");
         return await reply(
-          `These times are available:\n${menu}\nReply with the number you'd like${profile ? "" : ", and please include your name"}.`,
+          `These times are available:\n${menu}\nReply with the number you'd like, and a line on what it's concerning${profile ? "" : ", and your name"}.`,
           { state: "collecting_booking", intent: slotType, draft: { slot_type: slotType, offered_slots: slots }, turn_count: 0 },
         );
       }
@@ -181,11 +181,15 @@ Deno.serve(async (req: Request) => {
       if (idx >= 1 && idx <= draft.offered_slots.length) {
         draft.slot_index = idx;
         const chosen = draft.offered_slots[idx - 1];
-        if (!profile && !draft.name) {
-          return await reply("Thank you. And what name should we put down?", { state: "collecting_booking", draft });
+        const missing = [
+          !profile && !draft.name ? "your name" : null,
+          !draft.purpose ? "a line on what it's concerning" : null,
+        ].filter(Boolean);
+        if (missing.length) {
+          return await reply(`Thank you. Could you send ${missing.join(" and ")}?`, { state: "collecting_booking", draft });
         }
         return await reply(
-          `To confirm: a ${draft.slot_type === "call" ? "phone call" : "meeting"} with the Rov at ${fmtSlot(chosen.startsAt, tz)} for ${profile?.full_name ?? draft.name}. Reply YES to confirm or NO to cancel.`,
+          `To confirm: a ${draft.slot_type === "call" ? "phone call" : "meeting"} with the Rov at ${fmtSlot(chosen.startsAt, tz)} for ${profile?.full_name ?? draft.name}, about ${draft.purpose}. Reply YES to confirm or NO to cancel.`,
           { state: "confirming", draft },
         );
       }
@@ -264,6 +268,15 @@ Deno.serve(async (req: Request) => {
 
     const system = `You are the SMS assistant for Rabbi Yechiel Emanuel. You help people (often without smartphones) do exactly three things by text: (1) send the Rov a halachic question (a shailah), (2) book a phone call, (3) request a face-to-face meeting.
 
+WHAT THEY WANT (decide this first, every turn):
+- Anything asking to SPEAK to the Rov \u2014 "can I have a call", "can he ring me", "I need to talk to him", "can I speak to the Rov" \u2014 is intent "call". It is NOT a shailah. Do not offer to pass it on as a question.
+- Anything asking to SEE him, come in, or meet is intent "meeting".
+- A halachic question they want answered is intent "shailah".
+- If they ask for a call AND give a question, it is "call" \u2014 they have told you how they want it dealt with.
+
+FOR A CALL OR A MEETING:
+Ask what it is concerning, in one line, before you offer times \u2014 the Rov wants to know what the call is about before he rings, and a one-line answer is enough ("my son\u2019s school", "a business matter"). Put it in "purpose". Do not press for detail: if they would rather not say, that is fine, use "would rather say on the phone" and carry on.
+
 HARD RULES:
 - You NEVER answer halachic questions, give advice, or paskin — not even a hint. Every question goes to the Rov.
 - Replies must fit in one SMS: at most 300 characters, plain warm English, no emoji.
@@ -286,6 +299,7 @@ CONVERSATION CONTEXT:
       [
         !draft.question && conv.intent === "shailah" ? "their question" : null,
         !(profile?.full_name ?? draft.name) ? "their name" : null,
+        !draft.purpose && (conv.intent === "call" || conv.intent === "meeting") ? "what it is concerning (one line)" : null,
       ].filter(Boolean).join("; ") || "nothing \u2014 confirm what you have"
     }
 - numbered slots currently offered: ${offered}
@@ -391,7 +405,8 @@ Only include updates fields you learned THIS turn. slot_index must reference the
 
     const shailahReady = intent === "shailah" && Boolean(newDraft.question) && Boolean(who) && enoughDetail;
     const bookingReady = (intent === "call" || intent === "meeting")
-      && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who);
+      && Boolean(newDraft.slot_index) && Boolean(newDraft.offered_slots) && Boolean(who)
+      && Boolean(newDraft.purpose);
 
     let finalState: ConvState = nextState;
     if (shailahReady) {
@@ -404,7 +419,7 @@ Only include updates fields you learned THIS turn. slot_index must reference the
       finalState = "confirming";
       const slot = newDraft.offered_slots![newDraft.slot_index! - 1];
       replyText = `To confirm: a ${newDraft.slot_type === "call" ? "phone call" : "meeting"} with the Rov at `
-        + `${fmtSlot(slot.startsAt, tz)} for ${who}. Reply YES to confirm or NO to cancel.`;
+        + `${fmtSlot(slot.startsAt, tz)} for ${who}, about ${newDraft.purpose}. Reply YES to confirm or NO to cancel.`;
     } else if (nextState === "confirming") {
       // The model wanted to confirm without the material to confirm — stay and keep collecting.
       finalState = intent === "shailah" ? "collecting_shailah" : intent ? "collecting_booking" : "intent";
