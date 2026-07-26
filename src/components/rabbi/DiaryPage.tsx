@@ -244,22 +244,35 @@ function Zmanim({ day }: { day?: CalendarDay }) {
   const times = ZMANIM_SHOWN.filter((z) => day.zmanim?.[z.key]);
   if (!times.length) return null;
   return (
-    <Panel className="px-5 py-3.5 flex items-center gap-x-5 gap-y-2 flex-wrap">
-      <span className="text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-ink-muted flex-none">
-        Zmanim today{day.hebrew_date ? ` · ${day.hebrew_date}` : ''}
-      </span>
-      {times.map((z) => (
-        <span key={z.key} className="flex items-baseline gap-1.5">
-          <span className="text-[11.5px] text-ink-muted">{z.label}</span>
-          <span className="font-mono text-[12px] font-semibold">{format(new Date(day.zmanim![z.key]), 'HH:mm')}</span>
-        </span>
-      ))}
-      {day.candles_at && (
-        <span className="flex items-baseline gap-1.5 text-warn">
-          <span className="text-[11.5px] font-bold">✦ Candles</span>
-          <span className="font-mono text-[12px] font-bold">{format(new Date(day.candles_at), 'HH:mm')}</span>
-        </span>
-      )}
+    <Panel className="px-5 py-4 flex flex-col gap-3">
+      <div className="flex items-baseline gap-2.5 flex-wrap">
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.11em] text-ink-muted">Zmanim today</span>
+        {day.hebrew_date && (
+          <span className="font-mono text-[11.5px] font-medium text-ink-faint">{day.hebrew_date}</span>
+        )}
+        {day.candles_at && (
+          <span className="ml-auto flex items-baseline gap-2 rounded-chip bg-warn-bg px-2.5 py-1">
+            <span className="text-[11.5px] font-extrabold text-warn">✦ Candles</span>
+            <span className="font-mono text-[14px] font-bold tabular-nums text-warn">
+              {format(new Date(day.candles_at), 'HH:mm')}
+            </span>
+          </span>
+        )}
+      </div>
+      {/* A row of times he reads at a glance: the number is the thing, so it gets the weight —
+          tabular figures so the columns line up rather than shimmering as the minutes change. */}
+      <div className="flex flex-wrap gap-x-7 gap-y-3">
+        {times.map((z) => (
+          <span key={z.key} className="flex flex-col gap-0.5">
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-ink-muted whitespace-nowrap">
+              {z.label}
+            </span>
+            <span className="font-mono text-[15px] font-semibold tabular-nums leading-none">
+              {format(new Date(day.zmanim![z.key]), 'HH:mm')}
+            </span>
+          </span>
+        ))}
+      </div>
     </Panel>
   );
 }
